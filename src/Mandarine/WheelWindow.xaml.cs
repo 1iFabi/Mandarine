@@ -374,7 +374,7 @@ public partial class WheelWindow : Window
         return measured <= width ? size : Math.Max(min, size * width / measured);
     }
 
-    static ImageSource? LoadLogo()
+    internal static ImageSource? LoadLogo()
     {
         var path = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "mandarine.png");
         if (!System.IO.File.Exists(path)) return null;

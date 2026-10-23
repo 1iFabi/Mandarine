@@ -1,0 +1,50 @@
+<UserControl x:Class="Mandarine.EditorPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <ResourceDictionary Source="EditorStyles.xaml" />
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource Pane}">
+        <DockPanel>
+            <!-- Head: the tangerine, the tool, the file (and how many files the setting reaches). -->
+            <DockPanel DockPanel.Dock="Top" Margin="20,20,20,0">
+                <Image x:Name="Logo" Width="36" Height="36" DockPanel.Dock="Left" Margin="0,0,12,0" VerticalAlignment="Top"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="ToolName" FontWeight="SemiBold" Foreground="{StaticResource Ink}" />
+                    <TextBlock x:Name="FileName" Style="{StaticResource Caption}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock x:Name="Progress" x:FieldModifier="public" Style="{StaticResource Caption}" Foreground="{StaticResource Ink}" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Foot: the index tab naming the file about to be written, holding the two ways out. -->
+            <Grid DockPanel.Dock="Bottom" Margin="16,8,16,16">
+                <Border Background="{StaticResource Manila}" CornerRadius="8,8,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
+                        Height="27" Padding="12,0">
+                    <TextBlock Text="Se guardará" FontWeight="SemiBold" Foreground="{StaticResource ManilaInk}" VerticalAlignment="Center" />
+                </Border>
+                <Border Margin="0,26,0,0" Background="{StaticResource Manila}" CornerRadius="0,10,10,10" Padding="14,12,14,14">
+                    <StackPanel>
+                        <TextBlock x:Name="OutputName" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="OutputMeta" Foreground="{StaticResource ManilaInk}" TextWrapping="Wrap" Margin="0,2,0,0" />
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition />
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="CancelButton" x:FieldModifier="public" Content="Cancelar" Style="{StaticResource TabAction}" ToolTip="Esc" />
+                            <Button x:Name="SaveButton" x:FieldModifier="public" Grid.Column="2" Content="Guardar" Style="{StaticResource Primary}" ToolTip="Enter" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Each editor puts its option groups here, one above the other. -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False" Margin="0,20,0,0">
+                <StackPanel x:Name="Body" x:FieldModifier="public" Margin="20,0,20,8" />
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</UserControl>

@@ -114,6 +114,7 @@ public static class Catalog
         new("txt", "TXT", PdfSteps("{\"tool\":\"doc_export_text\",\"args\":{\"doc\":1,\"path\":{out}}}"), Engine.Pdfcraft),
         new("html", "HTML", PdfOffice, Engine.Pdfcraft),
         new("rtf", "RTF", PdfOffice, Engine.Pdfcraft),
+        new("pptx", "PPTX", PdfOffice, Engine.Pdfcraft), // one editable slide per page
     };
 
     // ---- Tools (the Ctrl wheel). Same file type out, except where noted. ----
@@ -127,7 +128,8 @@ public static class Catalog
     static readonly Format CompressImage = new("", "Comprimir", Split($"-frames:v 1 -vf {Fit2048} -q:v 5 -quality 75 -compression_level 9"), Icon: IconCompress);
     static readonly Format StripImage = new("", "Metadatos", new[] { "strip" }, Engine.Builtin, IconMetadata);
     static readonly Format StripMedia = new("", "Metadatos", Split("-map 0 -map_metadata -1 -map_chapters -1 -c copy"), Icon: IconMetadata);
-    static readonly Format RotateImage = new("", "Rotar", Split("-frames:v 1 -vf transpose=clock -q:v 2 -quality 90 -compression_level 9"), Icon: IconRotate);
+    // Opens a window to pick 90, 180 or 270 degrees, then runs Rotation for each file.
+    static readonly Format Rotate = new("", "Rotar", new[] { "rotate" }, Engine.Editor, IconRotate);
     static readonly Format RemoveBackground = new("png", "Sin fondo", new[] { "removebg" }, Engine.Builtin, IconCutout);
 
     // Picture editors (EditorWindow); Args[0] names the editor.
@@ -138,11 +140,12 @@ public static class Catalog
         new("", "Ocultar", new[] { "redact" }, Engine.Editor, ""),
         new("", "Ajustes", new[] { "adjust" }, Engine.Editor, ""),
         new("", "Fondo", new[] { "frame" }, Engine.Editor, ""),
+        new("", "Redimensionar", new[] { "resize" }, Engine.Editor, "\uE740"),
     };
 
-    static readonly Format[] JpegPngTools = Editors.Concat(new[] { RemoveBackground, RotateImage, CompressImage, StripImage }).ToArray();
-    static readonly Format[] WebpTools = Editors.Concat(new[] { RemoveBackground, RotateImage, CompressImage }).ToArray();
-    static readonly Format[] BitmapTools = Editors.Concat(new[] { RemoveBackground, RotateImage }).ToArray();
+    static readonly Format[] JpegPngTools = Editors.Concat(new[] { RemoveBackground, Rotate, CompressImage, StripImage }).ToArray();
+    static readonly Format[] WebpTools = Editors.Concat(new[] { RemoveBackground, Rotate, CompressImage }).ToArray();
+    static readonly Format[] BitmapTools = Editors.Concat(new[] { RemoveBackground, Rotate }).ToArray();
     static readonly Format[] HeifTools = Editors.Append(RemoveBackground).ToArray(); // ffmpeg reads HEIC/AVIF stills but cannot write HEIC
     static readonly Format[] AudioTools =
     {
@@ -154,17 +157,42 @@ public static class Catalog
     {
         new("mp4", "Comprimir", Split("-c:v libx264 -crf 28 -preset medium -pix_fmt yuv420p -vf scale='min(1920,iw)':'min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2 -c:a aac -b:a 128k -movflags +faststart"), Icon: IconCompress),
         StripMedia,
-        new("mp4", "Rotar", Split("-vf transpose=clock," + Even + " -c:v libx264 -crf 20 -preset medium -pix_fmt yuv420p -c:a aac -b:a 192k -movflags +faststart"), Icon: IconRotate),
+        Rotate,
     };
+
+    /// <summary>Clockwise by 90, 180 or 270 degrees: pictures keep their format, videos become MP4.</summary>
+    public static Format Rotation(string file, int degrees)
+    {
+        var turn = degrees switch { 90 => "transpose=clock", 180 => "transpose=clock,transpose=clock", 270 => "transpose=cclock", _ => throw new ArgumentOutOfRangeException(nameof(degrees)) };
+        return VideoExts.Split(' ').Contains(ExtOf(file).ToLowerInvariant())
+            ? new("mp4", "Rotar", Split($"-vf {turn},{Even} -c:v libx264 -crf 20 -preset medium -pix_fmt yuv420p -c:a aac -b:a 192k -movflags +faststart"), Icon: IconRotate)
+            : new("", "Rotar", Split($"-frames:v 1 -vf {turn} -q:v 2 -quality 90 -compression_level 9"), Icon: IconRotate);
+    }
+
     static readonly Format[] PdfTools =
     {
-        new("", "Rotar", PdfSteps("{\"tool\":\"page_rotate\",\"args\":{\"doc\":1,\"degrees\":90}},{\"tool\":\"doc_save\",\"args\":{\"doc\":1,\"path\":{out}}}"), Engine.Pdfcraft, IconRotate),
-        new("", "Dividir", PdfSteps("{\"tool\":\"doc_split\",\"args\":{\"doc\":1,\"every\":1,\"out_dir\":{out}}}"), Engine.Pdfcraft, IconSplit, ToFolder: true),
+        // Both open the page window (PdfPagesWindow), which hands back a PdfRotation or PdfParts.
+        new("", "Rotar", new[] { "pdfrotate" }, Engine.Editor, IconRotate),
+        new("", "Dividir", new[] { "pdfsplit" }, Engine.Editor, IconSplit),
         new("", "Texto (OCR)", new[] { "ocr" }, Engine.Builtin, IconText),
         new("", "Comprimir", PdfSteps("{\"tool\":\"doc_reduce\",\"args\":{\"doc\":1,\"path\":{out}}}"), Engine.Pdfcraft, IconCompress),
         new("", "Metadatos", PdfSteps("{\"tool\":\"doc_remove_hidden\",\"args\":{\"doc\":1,\"categories\":[\"metadata\",\"private-data\"]}},{\"tool\":\"doc_save\",\"args\":{\"doc\":1,\"path\":{out}}}"), Engine.Pdfcraft, IconMetadata),
         new("pdf", "Unir", new[] { "[{\"tool\":\"doc_combine\",\"args\":{\"paths\":{in},\"out\":{out}}}]" }, Engine.Pdfcraft, IconCombine, Combines: true, MinFiles: 2),
     };
+
+    const string PdfSave = "{\"tool\":\"doc_save\",\"args\":{\"doc\":1,\"path\":{out}}}";
+
+    /// <summary>Clockwise degrees for each page, in order; pages at 0 stay as they are.</summary>
+    public static Format PdfRotation(IReadOnlyList<int> degrees) => new("", "Rotar", PdfSteps(string.Join(",", degrees
+        .Select((d, i) => (Degrees: d % 360, Page: i + 1)).Where(p => p.Degrees != 0).GroupBy(p => p.Degrees)
+        .Select(g => "{\"tool\":\"page_rotate\",\"args\":{\"doc\":1,\"degrees\":" + g.Key + ",\"pages\":[" + string.Join(",", g.Select(p => p.Page)) + "]}}")
+        .Append(PdfSave))), Engine.Pdfcraft, IconRotate);
+
+    /// <summary>A PDF per page range (1-based, inclusive), in order; ranges may skip or repeat pages.</summary>
+    public static Format PdfParts(IReadOnlyList<(int From, int To)> parts) => new("", "Dividir", PdfSteps(string.Join(",", parts.Select((p, k) =>
+        "{\"tool\":\"page_extract\",\"args\":{\"doc\":1,\"pages\":[" + string.Join(",", Enumerable.Range(p.From, p.To - p.From + 1)) +
+        "],\"out\":{out:" + (p.From == p.To ? $"parte {k + 1} (pág. {p.From}).pdf" : $"parte {k + 1} (págs. {p.From}-{p.To}).pdf") + "}}}"))),
+        Engine.Pdfcraft, IconSplit, ToFolder: true);
 
     // Any file or folder.
     static readonly Format[] AnyTools = { new("zip", "ZIP", new[] { "zip" }, Engine.Builtin, IconZip, Combines: true) };
@@ -184,6 +212,7 @@ public static class Catalog
 
     public static IReadOnlyList<Format> ActionsFor(IReadOnlyCollection<string> paths) => paths.Count == 0 ? Array.Empty<Format>() : FileActions;
 
+    const string VideoExts = "mp4 m4v mov mkv webm avi wmv";
     static readonly Dictionary<string, Format[]> ByInput = new(StringComparer.OrdinalIgnoreCase);
     static readonly Dictionary<string, Format[]> ToolsByInput = new(StringComparer.OrdinalIgnoreCase);
 
@@ -203,7 +232,7 @@ public static class Catalog
         foreach (var e in "heic heif avif".Split(' ')) ToolsByInput[e] = HeifTools;
         ToolsByInput["zip"] = ZipTools;
         foreach (var e in "mp3 m4a aac wav flac ogg opus aif aiff wma".Split(' ')) ToolsByInput[e] = AudioTools;
-        foreach (var e in "mp4 m4v mov mkv webm avi wmv".Split(' ')) ToolsByInput[e] = VideoTools;
+        foreach (var e in VideoExts.Split(' ')) ToolsByInput[e] = VideoTools;
         ToolsByInput["pdf"] = PdfTools;
     }
 

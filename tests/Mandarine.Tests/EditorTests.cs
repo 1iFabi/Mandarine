@@ -21,8 +21,10 @@ public class EditorTests : IDisposable
         Assert.Contains("Anotar", labels);
         Assert.Contains("Ocultar", labels);
         Assert.Contains("Ajustes", labels);
+        Assert.Contains("Redimensionar", labels);
         Assert.Contains("Fondo", labels);
-        Assert.DoesNotContain(Catalog.ToolsFor(new[] { "clip.mp4" }), t => t.Engine == Engine.Editor);
+        Assert.Equal(new[] { "rotate" }, Catalog.ToolsFor(new[] { "clip.mp4" }).Where(t => t.Engine == Engine.Editor).Select(t => t.Args[0]));
+        Assert.Equal(new[] { "pdfrotate", "pdfsplit" }, Catalog.ToolsFor(new[] { "a.pdf" }).Where(t => t.Engine == Engine.Editor).Select(t => t.Args[0]));
         Assert.Equal("png", ImageEdit.OutputExt("x.webp"));
         Assert.Equal("jpg", ImageEdit.OutputExt("x.JPG"));
     }
@@ -34,6 +36,8 @@ public class EditorTests : IDisposable
         Ffmpeg($"-f lavfi -i testsrc=size=400x200 -frames:v 1 \"{jpg}\"");
         var picture = ImageEdit.Load(jpg).GetAwaiter().GetResult();
         Assert.Equal((400, 200), (picture.PixelWidth, picture.PixelHeight));
+
+        Assert.Equal((100, 50), (ImageEdit.Resize(picture, 0.25).PixelWidth, ImageEdit.Resize(picture, 0.25).PixelHeight));
 
         // Crop takes a share, saves and reads back at that size.
         var cropped = ImageEdit.Crop(picture, new Rect(0.25, 0, 0.5, 1));
@@ -74,19 +78,84 @@ public class EditorTests : IDisposable
     [InlineData("annotate")]
     [InlineData("adjust")]
     [InlineData("frame")]
+    [InlineData("rotate")]
+    [InlineData("resize")]
     public void Renders_editor_preview(string op) => OnSta(() =>
     {
         var jpg = Path.Combine(_dir, "foto.jpg");
         Ffmpeg($"-f lavfi -i testsrc=size=1200x800 -frames:v 1 \"{jpg}\"");
         var picture = ImageEdit.Load(jpg).GetAwaiter().GetResult();
         var tool = Catalog.ToolsFor(new[] { jpg }).Single(t => t.Args[0] == op);
-        var editor = new EditorWindow(op, tool.Label, picture, "foto.jpg", "1 de 3")
+        Snapshot(new EditorWindow(op, tool.Label, picture, "C:/Fotos/foto.jpg", "C:/Fotos/foto (Mandarine).jpg", "1 de 3"), $"mandarine-editor-{op}.png");
+    });
+
+    // The PDF page window over a five-page PDF made from pictures, with a page chosen or a cut made.
+    [Theory]
+    [InlineData("pdfrotate")]
+    [InlineData("pdfsplit")]
+    [InlineData("pdfview")]
+    public void Renders_pdf_pages_preview(string shot) => OnSta(() =>
+    {
+        var png = Path.Combine(_dir, "pagina.png");
+        Ffmpeg($"-f lavfi -i testsrc=size=850x1100 -frames:v 1 \"{png}\"");
+        var pdf = Converter.CombineAsync(Enumerable.Repeat(png, 5).ToArray(), Catalog.TargetsFor(new[] { png }).Single(f => f.Ext == "pdf")).GetAwaiter().GetResult();
+        if (shot == "pdfview")
         {
-            Width = 1100, Height = 700, Left = -20000, Top = 0, ShowActivated = false, WindowStartupLocation = WindowStartupLocation.Manual,
-        };
+            // Text, to check the reader is sharp enough to read.
+            var html = Path.Combine(_dir, "texto.html");
+            File.WriteAllText(html, "<h1>Capítulo uno</h1>" + string.Concat(Enumerable.Repeat("<p>El texto pequeño de un contrato tiene que leerse sin esfuerzo al ampliar la página en el lector.</p>", 30)));
+            pdf = Converter.ConvertAsync(html, Catalog.TargetsFor(new[] { html }).Single(f => f.Ext == "pdf")).GetAwaiter().GetResult();
+        }
+        var pages = PdfPagesWindow.Thumbnails(pdf).GetAwaiter().GetResult();
+        if (shot != "pdfview") Assert.Equal(5, pages.Count);
+        var op = shot == "pdfrotate" ? "pdfrotate" : "pdfsplit";
+        var window = new PdfPagesWindow(op, op == "pdfrotate" ? "Rotar" : "Dividir", pdf, pages, "");
+        var toggles = Descendants(window).OfType<System.Windows.Controls.Primitives.ToggleButton>().ToList();
+        Assert.Equal(op == "pdfrotate" ? 5 : pages.Count - 1, toggles.Count); // a tile per page, or a gap between each two
+        Snapshot(window, $"mandarine-editor-{shot}.png", wait: shot == "pdfview" ? 2500 : 400, act: () =>
+        {
+            if (shot == "pdfview")
+            {
+                var page = Descendants(window).OfType<System.Windows.Controls.ContentControl>().First(c => c.GetType() == typeof(System.Windows.Controls.ContentControl));
+                page.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
+                    { RoutedEvent = System.Windows.Controls.Control.MouseDoubleClickEvent });
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle); // laid out before fitting to the width
+                Descendants(window).OfType<System.Windows.Controls.Button>().First(b => Equals(b.Content, "Ancho"))
+                    .RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                return;
+            }
+            // Rotate: page 2 chosen and turned. Split: a cut after page 2.
+            toggles[1].IsChecked = true;
+            toggles[1].RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            if (op == "pdfrotate") Descendants(window).OfType<System.Windows.Controls.Button>().First(b => Equals(b.Content, "90°"))
+                .RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+        });
+    });
+
+    static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<DependencyObject>())
+        {
+            yield return child;
+            foreach (var d in Descendants(child)) yield return d;
+        }
+    }
+
+    /// <summary>Renders a window off-screen into %TEMP% so its layout can be looked at; act runs once it is shown.</summary>
+    static void Snapshot(Window editor, string name, Action? act = null, int wait = 400)
+    {
+        editor.Width = 1100;
+        editor.Height = 700;
+        editor.Left = -20000;
+        editor.Top = 0;
+        editor.ShowActivated = false;
+        editor.WindowStartupLocation = WindowStartupLocation.Manual;
+        // As on the app's UI thread, so the window's awaits come back to it (set only now: the test's blocking waits would deadlock).
+        SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(editor.Dispatcher));
         editor.Show();
+        act?.Invoke();
         var frame = new DispatcherFrame();
-        new DispatcherTimer(TimeSpan.FromMilliseconds(400), DispatcherPriority.Normal,
+        new DispatcherTimer(TimeSpan.FromMilliseconds(wait), DispatcherPriority.Normal,
             (s, _) => { ((DispatcherTimer)s!).Stop(); frame.Continue = false; }, editor.Dispatcher).Start();
         Dispatcher.PushFrame(frame);
 
@@ -96,16 +165,16 @@ public class EditorTests : IDisposable
         using (var dc = visual.RenderOpen())
         {
             dc.DrawRectangle(editor.Background, null, new Rect(0, 0, content.ActualWidth, content.ActualHeight));
-            dc.DrawRectangle(new VisualBrush(content), null, new Rect(0, 0, content.ActualWidth, content.ActualHeight));
+            dc.DrawRectangle(new VisualBrush(content) { ViewboxUnits = BrushMappingMode.Absolute, Viewbox = new Rect(0, 0, content.ActualWidth, content.ActualHeight) }, null, new Rect(0, 0, content.ActualWidth, content.ActualHeight));
         }
         bmp.Render(visual);
         var png = new PngBitmapEncoder();
         png.Frames.Add(BitmapFrame.Create(bmp));
-        var path = Path.Combine(Path.GetTempPath(), $"mandarine-editor-{op}.png");
+        var path = Path.Combine(Path.GetTempPath(), name);
         using (var f = File.Create(path)) png.Save(f);
         editor.Close();
         Assert.True(new FileInfo(path).Length > 10_000);
-    });
+    }
 
     static double Mean(BitmapSource image, Int32Rect? area = null) => Values(image, area).Average();
 

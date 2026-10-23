@@ -47,6 +47,24 @@ public partial class App : System.Windows.Application
             key.SetValue("DarkWheel", dark.Checked ? 1 : 0, RegistryValueKind.DWord);
         };
         menu.Items.Add(dark);
+
+        // Per-user Run entry: no admin needed. Rewritten on every start so a moved folder keeps working.
+        const string run = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        var command = $"\"{Environment.ProcessPath}\"";
+        bool startup;
+        using (var key = Registry.CurrentUser.CreateSubKey(run))
+        {
+            startup = key.GetValue("Mandarine") != null;
+            if (startup) key.SetValue("Mandarine", command);
+        }
+        var autostart = new Forms.ToolStripMenuItem("Iniciar con Windows") { Checked = startup, CheckOnClick = true };
+        autostart.CheckedChanged += (_, _) =>
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(run);
+            if (autostart.Checked) key.SetValue("Mandarine", command);
+            else key.DeleteValue("Mandarine", false);
+        };
+        menu.Items.Add(autostart);
         menu.Items.Add("Salir", null, (_, _) => Shutdown());
         _tray = new Forms.NotifyIcon
         {

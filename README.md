@@ -25,7 +25,7 @@ converter come inside the zip.
 > **"Windows protected your PC"?** The app isn't code-signed yet, so SmartScreen warns about it the first time.
 > Click **More info → Run anyway**. You can check the download against the SHA-256 listed in each release.
 
-To start it with Windows, put a shortcut to `Mandarine.exe` in `shell:startup` (Win + R, type it, Enter).
+To start it with Windows, right-click the tray icon and tick **Iniciar con Windows** (start with Windows).
 
 ## How to use it
 
@@ -43,7 +43,7 @@ To start it with Windows, put a shortcut to `Mandarine.exe` in `shell:startup` (
 Results are saved **next to the original**, never over it (`photo.jpg` → `photo.webp`, or `photo (1).jpg` when the
 name is taken). Release over the centre, or press **Esc**, to cancel. Tapping another key mid-drag switches wheels.
 
-Right-click the tray icon for **Rueda oscura** (dark wheel) and **Salir** (exit).
+Right-click the tray icon for **Rueda oscura** (dark wheel), **Iniciar con Windows** (start with Windows) and **Salir** (exit).
 
 > Mandarine's interface is in Spanish for now; this page uses the English names of the options
 > (Crop = *Recortar*, Annotate = *Anotar*, Hide = *Ocultar*, Share = *Compartir*...).
@@ -60,20 +60,28 @@ Right-click the tray icon for **Rueda oscura** (dark wheel) and **Salir** (exit)
 | Documents: DOCX, DOC, ODT, RTF, HTML, Markdown, TeX, TXT | PDF, DOCX, ODT, RTF, MD, HTML, TXT |
 | Spreadsheets: XLSX, XLS, ODS, CSV, TSV | PDF (columns fitted to their content), XLSX, CSV, TSV, HTML |
 | Presentations: PPTX, PPSX, POTX | PDF, PNG, JPG, GIF, MD, TXT |
-| PDF | DOCX, PNG / JPG (one image per page), TXT, HTML, RTF |
+| PDF | DOCX, PPTX (one slide per page), PNG / JPG (one image per page), TXT, HTML, RTF |
 
 ### Tools (Ctrl)
 
 | For | Tools |
 |---|---|
-| Images | **Crop**, **Annotate** (arrow, box, pen, highlighter, text), **Hide** (pixelate or black out), **Adjust** (brightness, contrast, saturation, warmth), **Background** (gradient or colour, margin, rounded corners, shadow, canvas ratio), **Remove background**, Rotate, Compress, Remove metadata |
+| Images | **Crop**, **Annotate** (arrow, box, pen, highlighter, text), **Hide** (pixelate or black out), **Adjust** (brightness, contrast, saturation, warmth), **Background** (gradient or colour, margin, rounded corners, shadow, canvas ratio), **Resize** (by percentage or exact pixels, keeping the proportion), **Remove background**, **Rotate** (90°, 180° or 270°), Compress, Remove metadata |
 | Audio | Normalize loudness, Remove metadata |
-| Video | Compress, Rotate, Remove metadata |
-| PDF | Rotate, Split into pages, OCR (makes scans searchable; Spanish and English), Compress, Remove metadata, Merge (2+ PDFs) |
+| Video | Compress, **Rotate** (90°, 180° or 270°), Remove metadata |
+| PDF | **Rotate** (every page or the ones you pick), **Split** (by page ranges), OCR (makes scans searchable; Spanish and English), Compress, Remove metadata, Merge (2+ PDFs) |
 | Anything | Make a ZIP (files and folders); on a `.zip`, Extract |
 
-The image editors open a window. **Crop**, **Adjust** and **Background** are set once and applied to every dragged
-picture; **Annotate** and **Hide** go one picture at a time. Enter saves, Esc cancels, Ctrl+Z undoes.
+The image editors open a window: the picture on the left, the options on the right, and below them a tab that names
+the file about to be written, its size and its folder. **Crop** (drag, or type the area in pixels), **Adjust**,
+**Background** and **Resize** are set once and applied to every dragged picture; **Annotate** and **Hide** go one picture
+at a time. Enter saves, Esc cancels, Ctrl+Z undoes.
+
+**Rotate** opens a window too, to pick the angle. On a PDF it shows the pages: click the ones to turn (or none, to
+turn them all). **Split** shows the pages and, on the right, the parts as page ranges ("from 3 to 7"): type them, click
+between two pages to cut there, or use *Cada página* (every page) and *Por la mitad* (in half). One range extracts those
+pages into a new PDF; several are saved in a folder beside the original. Resize the pages on the right (or with
+Ctrl + wheel) and double-click one to see it large.
 
 ### Actions (Alt)
 
@@ -135,19 +143,19 @@ dotnet run --project src\Mandarine
 ### Make a release
 
 ```powershell
-.\scripts\package.ps1 -Version 1.0.0
+.\scripts\package.ps1 -Version 1.0.1
 ```
 
 It fetches the tools, runs the tests, publishes a self-contained build, checks every tool made it in, and writes
-`dist\Mandarine-v1.0.0-win-x64.zip` with its SHA-256. Then publish it, for example with the GitHub CLI:
+`dist\Mandarine-v1.0.1-win-x64.zip` with its SHA-256. Then publish it, for example with the GitHub CLI:
 
 ```powershell
-gh release create v1.0.0 dist\Mandarine-v1.0.0-win-x64.zip --title "Mandarine 1.0.0" --notes "SHA-256: <hash>"
+gh release create v1.0.1 dist\Mandarine-v1.0.1-win-x64.zip --title "Mandarine 1.0.1" --notes "SHA-256: <hash>"
 ```
 
 ## Known limitations
 
-- Picture editors only; video and audio trimming or redaction aren't there yet.
+- Video and audio trimming or redaction aren't there yet.
 - Alt can activate the menu bar of the window under the cursor after the drop.
 - OCR reads Spanish and English, ignores page skew, and may drop rare letters such as "ü".
 - Remove background takes about 10 seconds per picture on the CPU.

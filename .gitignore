@@ -4,3 +4,5 @@ obj/
 src/Mandarine/tools/
 dist/
 docs/ANALISIS.md
+.impeccable/*
+!.impeccable/surfaces/

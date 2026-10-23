@@ -26,7 +26,7 @@ todos los conversores vienen dentro del zip.
 > Haz clic en **Más información → Ejecutar de todas formas**. Puedes comprobar la descarga con el SHA-256 que figura
 > en cada release.
 
-Para que arranque con Windows, pon un acceso directo a `Mandarine.exe` en `shell:startup` (Win + R, escríbelo, Enter).
+Para que arranque con Windows, haz clic derecho en el ícono de la bandeja y marca **Iniciar con Windows**.
 
 ## Cómo se usa
 
@@ -44,7 +44,7 @@ Para que arranque con Windows, pon un acceso directo a `Mandarine.exe` en `shell
 El resultado se guarda **al lado del original**, nunca encima (`foto.jpg` → `foto.webp`, o `foto (1).jpg` si el nombre
 ya existe). Para cancelar, suelta sobre el centro o pulsa **Esc**. Si tocas otra tecla durante el arrastre, cambia la rueda.
 
-Con clic derecho en el ícono de la bandeja están **Rueda oscura** y **Salir**.
+Con clic derecho en el ícono de la bandeja están **Rueda oscura**, **Iniciar con Windows** y **Salir**.
 
 ## Qué puede hacer
 
@@ -58,20 +58,28 @@ Con clic derecho en el ícono de la bandeja están **Rueda oscura** y **Salir**.
 | Documentos: DOCX, DOC, ODT, RTF, HTML, Markdown, TeX, TXT | PDF, DOCX, ODT, RTF, MD, HTML, TXT |
 | Planillas: XLSX, XLS, ODS, CSV, TSV | PDF (columnas ajustadas al contenido), XLSX, CSV, TSV, HTML |
 | Presentaciones: PPTX, PPSX, POTX | PDF, PNG, JPG, GIF, MD, TXT |
-| PDF | DOCX, PNG / JPG (una imagen por página), TXT, HTML, RTF |
+| PDF | DOCX, PPTX (una diapositiva por página), PNG / JPG (una imagen por página), TXT, HTML, RTF |
 
 ### Herramientas (Ctrl)
 
 | Para | Herramientas |
 |---|---|
-| Imágenes | **Recortar**, **Anotar** (flecha, rectángulo, lápiz, resaltador, texto), **Ocultar** (pixelar o tapar en negro), **Ajustes** (brillo, contraste, saturación, calidez), **Fondo** (degradado o color, margen, esquinas redondeadas, sombra, proporción), **Sin fondo**, Rotar, Comprimir, Metadatos |
+| Imágenes | **Recortar**, **Anotar** (flecha, rectángulo, lápiz, resaltador, texto), **Ocultar** (pixelar o tapar en negro), **Ajustes** (brillo, contraste, saturación, calidez), **Fondo** (degradado o color, margen, esquinas redondeadas, sombra, proporción), **Redimensionar** (por porcentaje o en píxeles exactos, sin deformar), **Sin fondo**, **Rotar** (90°, 180° o 270°), Comprimir, Metadatos |
 | Audio | Normalizar el volumen, Metadatos |
-| Video | Comprimir, Rotar, Metadatos |
-| PDF | Rotar, Dividir en páginas, OCR (vuelve buscables los escaneos; español e inglés), Comprimir, Metadatos, Unir (2 o más PDF) |
+| Video | Comprimir, **Rotar** (90°, 180° o 270°), Metadatos |
+| PDF | **Rotar** (todas las páginas o las que elijas), **Dividir** (por rangos de páginas), OCR (vuelve buscables los escaneos; español e inglés), Comprimir, Metadatos, Unir (2 o más PDF) |
 | Cualquier cosa | Crear un ZIP (archivos y carpetas); sobre un `.zip`, Extraer |
 
-Los editores de imagen abren una ventana. **Recortar**, **Ajustes** y **Fondo** se configuran una vez y se aplican a
-todas las imágenes arrastradas; **Anotar** y **Ocultar** van de a una. Enter guarda, Esc cancela y Ctrl+Z deshace.
+Los editores de imagen abren una ventana: la imagen a la izquierda, las opciones a la derecha y, debajo, una pestaña
+que dice qué archivo se va a escribir, con qué tamaño y en qué carpeta. **Recortar** (arrastrando o escribiendo el área
+en píxeles), **Ajustes**, **Fondo** y **Redimensionar** se configuran una vez y se aplican a todas las imágenes
+arrastradas; **Anotar** y **Ocultar** van de a una. Enter guarda, Esc cancela y Ctrl+Z deshace.
+
+**Rotar** también abre una ventana para elegir el ángulo. En un PDF muestra las páginas: haz clic en las que quieras
+girar (o en ninguna, para girarlas todas). **Dividir** muestra las páginas y, a la derecha, las partes como rangos
+("desde la 3 hasta la 7"): escríbelos, corta haciendo clic entre dos páginas o usa **Cada página** y **Por la mitad**.
+Un solo rango extrae esas páginas a un PDF nuevo; varios se guardan en una carpeta junto al original. El tamaño de las
+páginas se cambia a la derecha (o con Ctrl + rueda) y un doble clic muestra una página en grande.
 
 ### Acciones (Alt)
 
@@ -133,19 +141,19 @@ dotnet run --project src\Mandarine
 ### Crear una release
 
 ```powershell
-.\scripts\package.ps1 -Version 1.0.0
+.\scripts\package.ps1 -Version 1.0.1
 ```
 
 Descarga las herramientas, corre los tests, compila una versión autocontenida, comprueba que estén todas las
-herramientas y genera `dist\Mandarine-v1.0.0-win-x64.zip` con su SHA-256. Después se publica, por ejemplo con GitHub CLI:
+herramientas y genera `dist\Mandarine-v1.0.1-win-x64.zip` con su SHA-256. Después se publica, por ejemplo con GitHub CLI:
 
 ```powershell
-gh release create v1.0.0 dist\Mandarine-v1.0.0-win-x64.zip --title "Mandarine 1.0.0" --notes "SHA-256: <hash>"
+gh release create v1.0.1 dist\Mandarine-v1.0.1-win-x64.zip --title "Mandarine 1.0.1" --notes "SHA-256: <hash>"
 ```
 
 ## Limitaciones conocidas
 
-- Solo hay editores de imagen; todavía no se puede recortar ni ocultar partes de video o audio.
+- Todavía no se puede recortar ni ocultar partes de video o audio.
 - Alt puede activar la barra de menú de la ventana que queda bajo el cursor después de soltar.
 - El OCR lee español e inglés, no corrige páginas torcidas y puede perder letras poco comunes como la "ü".
 - Quitar el fondo tarda unos 10 segundos por imagen en la CPU.

@@ -39,7 +39,8 @@ public static class Actions
                 break;
             case "terminal":
                 var folder = Directory.Exists(files[0]) ? files[0] : Path.GetDirectoryName(files[0])!;
-                try { Process.Start(new ProcessStartInfo("wt.exe") { ArgumentList = { "-d", folder }, UseShellExecute = true }); }
+                // The folder goes in as the working directory, never on wt's command line, where ";" starts a new command.
+                try { Process.Start(new ProcessStartInfo("wt.exe") { ArgumentList = { "-d", "." }, WorkingDirectory = folder, UseShellExecute = true }); }
                 catch (System.ComponentModel.Win32Exception) // no Windows Terminal: plain PowerShell
                 {
                     Process.Start(new ProcessStartInfo("powershell.exe") { WorkingDirectory = folder, UseShellExecute = true });

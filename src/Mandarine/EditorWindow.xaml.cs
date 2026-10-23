@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -19,9 +21,11 @@ public static class Editor
     public static async Task<int> Run(Format tool, string[] files)
     {
         var op = tool.Args[0];
+        if (op is "pdfrotate" or "pdfsplit") return await Pages(op, tool, files);
+        if (op == "rotate") return await Rotate(tool, files);
         // Crop, adjustments and frame are set once and applied to every picture (the same share of each);
         // annotations and hidden areas belong to one picture, so each gets its own editor.
-        var shared = op is "crop" or "adjust" or "frame";
+        var shared = op is "crop" or "adjust" or "frame" or "resize";
         Func<BitmapSource, BitmapSource>? apply = null;
         var saved = 0;
         for (var i = 0; i < files.Length; i++)
@@ -30,11 +34,39 @@ public static class Editor
             if (apply == null || !shared)
             {
                 var progress = files.Length == 1 ? "" : shared ? $"Se aplicará a {files.Length} imágenes" : $"{i + 1} de {files.Length}";
-                var editor = new EditorWindow(op, tool.Label, picture, System.IO.Path.GetFileName(files[i]), progress);
+                var editor = new EditorWindow(op, tool.Label, picture, files[i], Converter.OutputPath(files[i], OutputExt(op, files[i])), progress);
                 if (editor.ShowDialog() != true) return saved;
                 apply = editor.Result!;
             }
-            ImageEdit.Save(apply(picture), Converter.OutputPath(files[i], op == "frame" ? "png" : ImageEdit.OutputExt(files[i])));
+            ImageEdit.Save(apply(picture), Converter.OutputPath(files[i], OutputExt(op, files[i])));
+            saved++;
+        }
+        return saved;
+    }
+
+    static string OutputExt(string op, string file) => op == "frame" ? "png" : ImageEdit.OutputExt(file);
+
+    /// <summary>One angle for every picture or video, previewed on the first; ffmpeg does the turning.</summary>
+    static async Task<int> Rotate(Format tool, string[] files)
+    {
+        var progress = files.Length == 1 ? "" : $"Se aplicará a {files.Length} archivos";
+        var ext = Catalog.Rotation(files[0], 90).Ext is { Length: > 0 } e ? e : System.IO.Path.GetExtension(files[0]).TrimStart('.');
+        var editor = new EditorWindow("rotate", tool.Label, await ImageEdit.Load(files[0]), files[0], Converter.OutputPath(files[0], ext), progress);
+        if (editor.ShowDialog() != true) return 0;
+        foreach (var f in files) await Converter.ConvertAsync(f, Catalog.Rotation(f, editor.Degrees));
+        return files.Length;
+    }
+
+    /// <summary>The PDF page window, one document at a time: pages differ from file to file.</summary>
+    static async Task<int> Pages(string op, Format tool, string[] files)
+    {
+        var saved = 0;
+        for (var i = 0; i < files.Length; i++)
+        {
+            var progress = files.Length == 1 ? "" : $"{i + 1} de {files.Length}";
+            var window = new PdfPagesWindow(op, tool.Label, files[i], await PdfPagesWindow.Thumbnails(files[i]), progress);
+            if (window.ShowDialog() != true) return saved;
+            await Converter.ConvertAsync(files[i], window.Result!);
             saved++;
         }
         return saved;
@@ -62,20 +94,33 @@ public partial class EditorWindow : Window
     readonly Image _picture = new() { Stretch = Stretch.Fill };
     readonly Canvas _overlay = new() { Background = Brushes.Transparent, ClipToBounds = true };
     Func<Func<BitmapSource, BitmapSource>> _finish = () => p => p;
+    readonly string _output;
+    Func<string?> _detail; // the tab's size line, kept current by each editor
     Action? _undo;
     (TextBox Box, Point At, Color Color, Action<Mark> Add)? _typing;
 
     /// <summary>What to do to each picture, set when the user saves.</summary>
     public Func<BitmapSource, BitmapSource>? Result { get; private set; }
 
-    public EditorWindow(string op, string title, BitmapSource source, string fileName, string progress)
+    /// <summary>Rotate only: the chosen clockwise turn.</summary>
+    public int Degrees { get; private set; } = 90;
+
+    Button SaveButton => Pane.SaveButton;
+    Button CancelButton => Pane.CancelButton;
+
+    /// <summary>output is where the result will be written (shown on the tab); path is the file being edited.</summary>
+    public EditorWindow(string op, string title, BitmapSource source, string path, string output, string progress)
     {
         InitializeComponent();
         _source = source;
         _pw = source.PixelWidth;
         _ph = source.PixelHeight;
+        _output = output;
+        _detail = () => Px(_pw, _ph);
+        var fileName = System.IO.Path.GetFileName(path);
         Title = $"{title} · {fileName}";
-        Progress.Text = progress;
+        Icon = WheelWindow.LoadLogo();
+        Pane.Show(title, fileName, progress);
         var area = SystemParameters.WorkArea;
         Width = Math.Max(MinWidth, area.Width * 0.72);
         Height = Math.Max(MinHeight, area.Height * 0.82);
@@ -95,9 +140,12 @@ public partial class EditorWindow : Window
             case "annotate": BuildAnnotate(); break;
             case "adjust": BuildAdjust(); break;
             case "frame": BuildFrame(); break;
+            case "rotate": BuildRotate(); break;
+            case "resize": BuildResize(); break;
             default: throw new ArgumentException(op);
         }
         if (Hint.Text.Length == 0) Hint.Visibility = Visibility.Collapsed;
+        ShowOutput();
 
         SaveButton.Click += (_, _) => Save();
         CancelButton.Click += (_, _) => DialogResult = false;
@@ -106,6 +154,10 @@ public partial class EditorWindow : Window
         Topmost = true;
         ContentRendered += (_, _) => { Activate(); Topmost = false; };
     }
+
+    void ShowOutput() => Pane.Output(_output, _detail());
+
+    static string Px(double w, double h) => $"{Math.Round(w)} × {Math.Round(h)} px";
 
     void Save()
     {
@@ -144,8 +196,12 @@ public partial class EditorWindow : Window
         foreach (var h in handles) _overlay.Children.Add(h);
 
         Point[] Corners(Rect r) => new[] { r.TopLeft, r.TopRight, r.BottomRight, r.BottomLeft };
+        _detail = () => Px(crop.Width, crop.Height);
+        Action syncFields = () => { };
         void Draw()
         {
+            syncFields();
+            ShowOutput();
             var k = PxPerDip;
             dim.Data = new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(new Rect(0, 0, _pw, _ph)), new RectangleGeometry(crop));
             Place(border, crop);
@@ -220,6 +276,54 @@ public partial class EditorWindow : Window
             ("16:9", () => Pick(16 / 9.0)), ("9:16", () => Pick(9 / 16.0)),
         });
         void Pick(double r) { ratio = r; crop = Largest(r); Draw(); }
+
+        // The area in exact pixels; typing a size keeps the chosen proportion and the area inside the picture.
+        var syncing = false;
+        var boxes = new List<(TextBox Box, Func<double> Get)>();
+        TextBox Field(string unit, Func<double> get, Action<double> set)
+        {
+            var box = new TextBox { Padding = new Thickness(8, 5, 44, 5) };
+            Typography.SetNumeralAlignment(box, FontNumeralAlignment.Tabular);
+            AutomationProperties.SetName(box, unit);
+            box.TextChanged += (_, _) =>
+            {
+                if (syncing || !box.IsKeyboardFocused || !int.TryParse(box.Text, out var v)) return;
+                set(v);
+                Draw();
+            };
+            box.LostKeyboardFocus += (_, _) => { syncing = true; box.Text = Math.Round(get()).ToString(); syncing = false; };
+            boxes.Add((box, get));
+            return box;
+        }
+        void Size(double w, double h)
+        {
+            if (ratio > 0) h = w / ratio;
+            if (crop.X + w > _pw) { w = _pw - crop.X; if (ratio > 0) h = w / ratio; }
+            if (crop.Y + h > _ph) { h = _ph - crop.Y; if (ratio > 0) w = h * ratio; }
+            crop = new Rect(crop.X, crop.Y, Math.Max(1, w), Math.Max(1, h));
+        }
+        var fields = new UniformGrid { Columns = 2 };
+        foreach (var (unit, get, set) in new (string, Func<double>, Action<double>)[]
+        {
+            ("ancho", () => crop.Width, v => Size(v, crop.Height)),
+            ("alto", () => crop.Height, v => Size(ratio > 0 ? v * ratio : crop.Width, v)),
+            ("X", () => crop.X, v => crop.X = Math.Clamp(v, 0, _pw - crop.Width)),
+            ("Y", () => crop.Y, v => crop.Y = Math.Clamp(v, 0, _ph - crop.Height)),
+        })
+        {
+            var left = fields.Children.Count % 2 == 0;
+            var cell = new Grid { Margin = new Thickness(left ? 0 : 4, 0, left ? 4 : 0, 8) };
+            cell.Children.Add(Field(unit, get, set));
+            cell.Children.Add(new TextBlock { Text = unit, Style = (Style)FindResource("Caption"), HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 10, 0), IsHitTestVisible = false });
+            fields.Children.Add(cell);
+        }
+        syncFields = () =>
+        {
+            syncing = true;
+            foreach (var (box, get) in boxes) if (!box.IsKeyboardFocused) box.Text = Math.Round(get()).ToString();
+            syncing = false;
+        };
+        AddControl("Área en píxeles", fields);
         AddControl(null, ActionButton("Restablecer", () => { crop = ratio > 0 ? Largest(ratio) : new Rect(0, 0, _pw, _ph); Draw(); }));
 
         // Handles keep their on-screen size; measured once the stage has laid the picture out.
@@ -375,16 +479,14 @@ public partial class EditorWindow : Window
             AddSlider("Saturación", v => values = values with { Saturation = v }),
             AddSlider("Calidez", v => values = values with { Warmth = v }),
         };
+        Hint.Text = "Doble clic en un control lo vuelve a cero.";
         AddControl(null, ActionButton("Restablecer", () => sliders.ForEach(s => s.Value = 0)));
         Refresh();
 
         Slider AddSlider(string caption, Action<double> set)
         {
-            var slider = new Slider { Minimum = -100, Maximum = 100, Width = 100, VerticalAlignment = VerticalAlignment.Center, IsMoveToPointEnabled = true };
-            AutomationProperties.SetName(slider, caption);
-            slider.ValueChanged += (_, e) => { set(e.NewValue / 100); Refresh(); };
+            var slider = LabeledSlider(caption, -100, 100, 0, v => v == 0 ? "0" : v.ToString("+0;−0"), v => { set(v / 100); Refresh(); });
             slider.MouseDoubleClick += (_, _) => slider.Value = 0;
-            AddControl(caption, slider);
             return slider;
         }
         _finish = () =>
@@ -405,8 +507,9 @@ public partial class EditorWindow : Window
         void Refresh() => shown.Source = ImageEdit.Frame(preview, style);
 
         Swatches("Fondo", Backgrounds.Select(b => (b.Name, b.Fill == Brushes.Transparent ? Checker() : b.Fill, (Action)(() => { style = style with { Background = b.Fill }; Refresh(); }))));
-        AddControl("Margen", SliderFor(0, 25, 8, v => style = style with { Margin = v / 100 }));
-        AddControl("Esquinas", SliderFor(0, 12, 3, v => style = style with { Corners = v / 100 }));
+        _detail = () => "PNG";
+        LabeledSlider("Margen", 0, 25, 8, v => $"{v:0} %", v => { style = style with { Margin = v / 100 }; Refresh(); });
+        LabeledSlider("Esquinas", 0, 12, 3, v => $"{v:0} %", v => { style = style with { Corners = v / 100 }; Refresh(); });
         var shadow = new CheckBox { Content = "Sombra", IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
         shadow.Click += (_, _) => { style = style with { Shadow = shadow.IsChecked == true }; Refresh(); };
         AddControl(null, shadow);
@@ -417,17 +520,71 @@ public partial class EditorWindow : Window
         void Ratio(double r) { style = style with { Ratio = r }; Refresh(); }
         Refresh();
 
-        Slider SliderFor(double min, double max, double value, Action<double> set)
-        {
-            var slider = new Slider { Minimum = min, Maximum = max, Value = value, Width = 100, VerticalAlignment = VerticalAlignment.Center, IsMoveToPointEnabled = true };
-            slider.ValueChanged += (_, e) => { set(e.NewValue); Refresh(); };
-            return slider;
-        }
         _finish = () =>
         {
             var chosen = style;
             return p => ImageEdit.Frame(p, chosen);
         };
+    }
+
+    // ---- Rotate ----
+
+    void BuildRotate()
+    {
+        Hint.Text = "Gira en el sentido de las agujas del reloj.";
+        var preview = ImageEdit.Scaled(_source, 1600);
+        var shown = new Image();
+        Stage.Child = shown;
+        _detail = () => Degrees == 180 ? Px(_pw, _ph) : Px(_ph, _pw);
+        void Turn(int degrees) { Degrees = degrees; shown.Source = new TransformedBitmap(preview, new RotateTransform(degrees)); ShowOutput(); }
+        Segmented("Girar", new (string, Action)[] { ("90°", () => Turn(90)), ("180°", () => Turn(180)), ("270°", () => Turn(270)) });
+        Turn(90);
+    }
+
+    // ---- Resize ----
+
+    /// <summary>One scale for every picture, so several pictures shrink in the same proportion.</summary>
+    void BuildResize()
+    {
+        Hint.Text = "La imagen se ve igual; cambia su tamaño en píxeles. Se mantiene la proporción.";
+        var k = 0.5;
+        _detail = () => Px(_pw * k, _ph * k);
+        var syncing = false;
+        var boxes = new List<(TextBox Box, Func<double> Get)>();
+        void Show()
+        {
+            syncing = true;
+            foreach (var (box, get) in boxes) if (!box.IsKeyboardFocused) box.Text = Math.Round(get()).ToString();
+            syncing = false;
+            SaveButton.IsEnabled = k != 1;
+            ShowOutput();
+        }
+        void Scale(double v) { k = Math.Clamp(v, 1.0 / Math.Min(_pw, _ph), 4); Show(); } // at least 1 px, at most 4×
+
+        Segmented("Escala", new (string, Action)[]
+        {
+            ("25 %", () => Scale(0.25)), ("50 %", () => Scale(0.5)), ("75 %", () => Scale(0.75)), ("200 %", () => Scale(2)),
+        }, selected: 1);
+
+        var fields = new UniformGrid { Columns = 2 };
+        foreach (var (unit, side) in new[] { ("ancho", _pw), ("alto", _ph) })
+        {
+            var box = new TextBox { Padding = new Thickness(8, 5, 44, 5) };
+            Typography.SetNumeralAlignment(box, FontNumeralAlignment.Tabular);
+            AutomationProperties.SetName(box, unit);
+            box.TextChanged += (_, _) => { if (!syncing && box.IsKeyboardFocused && int.TryParse(box.Text, out var v) && v > 0) Scale((double)v / side); };
+            box.LostKeyboardFocus += (_, _) => Show();
+            boxes.Add((box, () => side * k));
+            var left = fields.Children.Count == 0;
+            var cell = new Grid { Margin = new Thickness(left ? 0 : 4, 0, left ? 4 : 0, 0) };
+            cell.Children.Add(box);
+            cell.Children.Add(new TextBlock { Text = unit, Style = (Style)FindResource("Caption"), HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0), IsHitTestVisible = false });
+            fields.Children.Add(cell);
+        }
+        AddControl("Tamaño en píxeles", fields);
+        AddControl(null, new TextBlock { Text = $"Original: {Px(_pw, _ph)}", Style = (Style)FindResource("Caption") });
+        Show();
+        _finish = () => { var scale = k; return p => ImageEdit.Resize(p, scale); };
     }
 
     // ---- Shared pieces ----
@@ -460,21 +617,32 @@ public partial class EditorWindow : Window
         };
     }
 
-    void AddControl(string? caption, UIElement control)
+    void AddControl(string? caption, UIElement control) => Pane.Add(caption, control);
+
+    /// <summary>A slider under its name, with its value (in figures of equal width) at the right.</summary>
+    Slider LabeledSlider(string caption, double min, double max, double value, Func<double, string> show, Action<double> set)
     {
-        var group = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 22, 4) };
-        if (caption != null) group.Children.Add(new TextBlock { Text = caption, Style = (Style)FindResource("Caption") });
-        group.Children.Add(control);
-        Controls.Children.Add(group);
+        var slider = new Slider { Minimum = min, Maximum = max, Value = value, SmallChange = 1, LargeChange = 5 };
+        AutomationProperties.SetName(slider, caption);
+        var shown = new TextBlock { Text = show(value), Foreground = (Brush)FindResource("Ink"), FontWeight = FontWeights.SemiBold };
+        Typography.SetNumeralAlignment(shown, FontNumeralAlignment.Tabular);
+        slider.ValueChanged += (_, e) => { var v = Math.Round(e.NewValue); shown.Text = show(v); set(v); };
+        var head = new DockPanel { Margin = new Thickness(0, 0, 0, 4) };
+        DockPanel.SetDock(shown, Dock.Right);
+        head.Children.Add(shown);
+        head.Children.Add(new TextBlock { Text = caption, Style = (Style)FindResource("Caption") });
+        AddControl(null, new StackPanel { Children = { head, slider } });
+        return slider;
     }
 
-    void Segmented(string caption, IEnumerable<(string Label, Action Pick)> options)
+    void Segmented(string caption, IEnumerable<(string Label, Action Pick)> options, int selected = 0)
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        var list = options.ToList();
+        var row = new UniformGrid { Columns = list.Count > 4 ? 3 : list.Count }; // more than four would truncate in the pane
         var group = Guid.NewGuid().ToString();
-        foreach (var (label, pick) in options)
+        foreach (var (label, pick) in list)
         {
-            var chip = new RadioButton { Content = label, GroupName = group, Style = (Style)FindResource("Chip"), IsChecked = row.Children.Count == 0 };
+            var chip = new RadioButton { Content = label, GroupName = group, Style = (Style)FindResource("Chip"), IsChecked = row.Children.Count == selected };
             chip.Checked += (_, _) => pick();
             row.Children.Add(chip);
         }
@@ -483,7 +651,7 @@ public partial class EditorWindow : Window
 
     void Swatches(string caption, IEnumerable<(string Name, Brush Fill, Action Pick)> options)
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        var row = new WrapPanel();
         var group = Guid.NewGuid().ToString();
         foreach (var (name, fill, pick) in options)
         {
@@ -497,7 +665,7 @@ public partial class EditorWindow : Window
 
     Button ActionButton(string label, Action click)
     {
-        var button = new Button { Content = label, Style = (Style)FindResource("Action"), Margin = new Thickness(0), Padding = new Thickness(12, 5, 12, 5) };
+        var button = new Button { Content = label, Style = (Style)FindResource("Action"), HorizontalAlignment = HorizontalAlignment.Left };
         button.Click += (_, _) => click();
         return button;
     }

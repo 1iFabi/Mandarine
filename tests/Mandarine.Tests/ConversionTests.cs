@@ -24,6 +24,14 @@ public class ConversionTests : IDisposable
     }
 
     [Fact]
+    public void Placeholders_in_file_names_stay_as_they_are() =>
+        Assert.Equal("a{out}.pdf -> b.pdf", Converter.Fill("{in} -> {out}", "a{out}.pdf", "b.pdf"));
+
+    [Fact]
+    public void Out_with_a_name_is_a_file_in_the_output_folder() =>
+        Assert.Equal(@"[""x"",""C:\\d\\p 1.pdf""]", Converter.Fill("[{in},{out:p 1.pdf}]", "\"x\"", @"C:\d", s => JsonSerializer.Serialize(s)));
+
+    [Fact]
     public void OutputPath_never_overwrites()
     {
         var input = Path.Combine(_dir, "song.wav");
@@ -101,7 +109,7 @@ public class ConversionTests : IDisposable
     {
         var pdf = await TwoPagePdf("informe");
         var targets = Catalog.TargetsFor(new[] { pdf });
-        Assert.Equal(new[] { "docx", "png", "jpg", "txt", "html", "rtf" }, targets.Select(f => f.Ext));
+        Assert.Equal(new[] { "docx", "png", "jpg", "txt", "html", "rtf", "pptx" }, targets.Select(f => f.Ext));
         foreach (var target in targets)
         {
             var output = await Converter.ConvertAsync(pdf, target);
@@ -109,7 +117,62 @@ public class ConversionTests : IDisposable
         }
         Assert.Equal(2, Directory.GetFiles(Path.Combine(_dir, "informe")).Length); // the PNG pages
         Assert.Contains("Segunda", File.ReadAllText(Path.Combine(_dir, "informe.txt")));
+
+        // And back: the slides deckcraft reads make a two-page PDF again.
+        var pptx = Path.Combine(_dir, "informe.pptx");
+        var again = await Converter.ConvertAsync(pptx, Catalog.TargetsFor(new[] { pptx }).Single(f => f.Ext == "pdf"));
+        Assert.Contains("\"pages\": 2", Run(Tools.Exe(Engine.Pdfcraft), "info", again));
     }
+
+    [Fact]
+    public async Task Rotation_turns_pictures_and_videos_by_the_chosen_angle()
+    {
+        var webp = Path.Combine(_dir, "foto.webp");
+        var mp4 = Path.Combine(_dir, "clip.mp4");
+        Ffmpeg($"-f lavfi -i testsrc=size=300x200 -frames:v 1 \"{webp}\"");
+        Ffmpeg($"-f lavfi -i testsrc=size=320x240:rate=10:duration=1 -f lavfi -i sine=duration=1 -shortest \"{mp4}\"");
+        foreach (var (degrees, size) in new[] { (90, "200x300"), (180, "300x200"), (270, "200x300") })
+        {
+            var picture = await Converter.ConvertAsync(webp, Catalog.Rotation(webp, degrees));
+            Assert.EndsWith(".webp", picture); // keeps its format
+            Assert.Equal(size, Size(picture));
+        }
+        var video = await Converter.ConvertAsync(mp4, Catalog.Rotation(mp4, 270));
+        Assert.Equal("240x320", Size(video));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Catalog.Rotation(webp, 45));
+        Assert.Equal("rotate", Catalog.ToolsFor(new[] { mp4 }).Single(t => t.Label == "Rotar").Args[0]);
+    }
+
+    [Fact]
+    public async Task Pdf_pages_rotate_and_split_as_chosen()
+    {
+        var pdf = await TwoPagePdf("libro");
+        Assert.Equal(2, (await PdfPagesWindow.Thumbnails(pdf)).Count);
+        var tall = FirstPage(pdf);
+        Assert.True(tall[1] > tall[0], "fixture should be portrait");
+
+        // Only page 1 turns; page 0° entries are left out of the script.
+        Assert.DoesNotContain("\"pages\":[2]", Catalog.PdfRotation(new[] { 90, 0 }).Args[0]);
+        var turned = await Converter.ConvertAsync(pdf, Catalog.PdfRotation(new[] { 90, 0 }));
+        Assert.Equal(new[] { tall[1], tall[0] }, FirstPage(turned));
+        Assert.Equal(tall, FirstPage(await Converter.ConvertAsync(pdf, Catalog.PdfRotation(new[] { 180, 180 }))));
+
+        var parts = await Converter.ConvertAsync(pdf, Catalog.PdfParts(new[] { (1, 1), (1, 2) }));
+        var files = Directory.GetFiles(parts).Select(Path.GetFileName).Order().ToArray();
+        Assert.Equal(new[] { "parte 1 (pág. 1).pdf", "parte 2 (págs. 1-2).pdf" }, files); // ranges may repeat pages
+        Assert.Contains("\"pages\": 2", Run(Tools.Exe(Engine.Pdfcraft), "info", Path.Combine(parts, files[1])));
+
+        // One range is an extraction: a single PDF beside the original.
+        var second = await Converter.ConvertAsync(pdf, Catalog.PdfParts(new[] { (2, 2) }));
+        Assert.Equal(".pdf", Path.GetExtension(second));
+        Assert.Contains("Segunda", Run(Tools.Exe(Engine.Pdfcraft), "text", second));
+    }
+
+    static double[] FirstPage(string pdf) =>
+        JsonDocument.Parse(Run(Tools.Exe(Engine.Pdfcraft), "info", pdf)).RootElement.GetProperty("first_page_pt").EnumerateArray().Select(v => v.GetDouble()).ToArray();
+
+    static string Size(string media) =>
+        Run("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", media).Trim();
 
     [Fact]
     public async Task Every_tool_runs()
@@ -130,7 +193,6 @@ public class ConversionTests : IDisposable
         foreach (var file in new[] { png, webp, wav, mp4, a })
             foreach (var tool in Catalog.ToolsFor(new[] { file }).Where(t => t.Args is not ["ocr"] and not ["removebg"] && t.Engine != Engine.Editor))
                 Assert.True(Produced(await Converter.ConvertAsync(file, tool)), $"{tool.Label} on {file}");
-        Assert.Equal(2, Directory.GetFiles(Path.Combine(_dir, "a")).Length); // Dividir: one PDF per page
 
         var combine = Catalog.ToolsFor(new[] { a, b }).Single(t => t.Label == "Unir");
         Assert.DoesNotContain(combine, Catalog.ToolsFor(new[] { a }));

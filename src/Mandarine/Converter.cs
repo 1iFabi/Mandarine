@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -148,14 +149,12 @@ public static class Converter
                 break;
             case Engine.Pdfcraft:
                 script = Path.GetTempFileName();
-                var json = target.Args[0]
-                    .Replace("{in}", target.Combines ? JsonSerializer.Serialize(inputs) : JsonSerializer.Serialize(input))
-                    .Replace("{out}", JsonSerializer.Serialize(output));
+                var json = Fill(target.Args[0], target.Combines ? JsonSerializer.Serialize(inputs) : JsonSerializer.Serialize(input), output, s => JsonSerializer.Serialize(s));
                 await File.WriteAllTextAsync(script, json);
                 args = new[] { "run", "--script", script };
                 break;
             default:
-                args = target.Args.Select(a => a.Replace("{in}", input).Replace("{out}", output));
+                args = target.Args.Select(a => Fill(a, input, output));
                 break;
         }
         foreach (var a in args) psi.ArgumentList.Add(a);
@@ -178,6 +177,14 @@ public static class Converter
             if (script != null) File.Delete(script);
         }
     }
+
+    /// <summary>
+    /// {in} becomes input as given; {out} the output, and {out:name} a file inside the output folder, both through quote.
+    /// One pass, so a file name that contains "{out}" is left as it is.
+    /// </summary>
+    public static string Fill(string template, string input, string output, Func<string, string>? quote = null) =>
+        Regex.Replace(template, @"\{in\}|\{out(?::([^{}]*))?\}", m => m.Value == "{in}" ? input
+            : (quote ?? (s => s))(m.Groups[1].Success ? Path.Combine(output, m.Groups[1].Value) : output));
 
     /// <summary>For tools that write several files (pages, parts): one result lands beside the input, several in a "name" folder.</summary>
     static async Task<string> ToFolder(string input, Format target)

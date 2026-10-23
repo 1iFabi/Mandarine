@@ -81,6 +81,15 @@ public static class ImageEdit
         return FromPixels(Pixels(scaled, out var w, out var h), w, h);
     }
 
+    /// <summary>Scales both sides by k, keeping the proportion.</summary>
+    public static BitmapSource Resize(BitmapSource image, double k)
+    {
+        if (k == 1) return image;
+        int w = Math.Max(1, (int)Math.Round(image.PixelWidth * k)), h = Math.Max(1, (int)Math.Round(image.PixelHeight * k));
+        var scaled = new TransformedBitmap(image, new ScaleTransform((double)w / image.PixelWidth, (double)h / image.PixelHeight));
+        return FromPixels(Pixels(scaled, out var sw, out var sh), sw, sh);
+    }
+
     /// <summary>Crops to a share of the picture (0-1 on each axis), so one crop fits pictures of any size.</summary>
     public static BitmapSource Crop(BitmapSource image, Rect share)
     {
