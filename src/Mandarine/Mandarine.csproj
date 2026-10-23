@@ -1,0 +1,26 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <!-- WPF + WinForms implicit usings collide (Application, MessageBox...); keep usings explicit. -->
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <!-- The icon Explorer, the taskbar and Alt+Tab show for Mandarine.exe. -->
+    <ApplicationIcon>Assets\mandarine.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\mandarine.ico;Assets\mandarine.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Converters fetched by scripts/fetch-tools.ps1 (not in git). -->
+    <Content Include="tools\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.31.0" />
+    <PackageReference Include="Tesseract" Version="5.2.0" />
+  </ItemGroup>
+
+</Project>
