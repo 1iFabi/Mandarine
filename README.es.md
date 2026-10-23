@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/banner.jpg" alt="Mandarine" width="640"></p>
+
 # Mandarine
 
 [English](README.md) · **Español**
@@ -156,3 +158,5 @@ detalladas en [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md); en particular, e
 
 Inspirado en el flujo de trabajo de Tangerine para Mac. Mandarine es un proyecto independiente, con código, nombre e
 imagen propios, sin relación con Tangerine ni con sus autores.
+
+Foto de la portada de [Pexels](https://www.pexels.com/photo/30552332/).

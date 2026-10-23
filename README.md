@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/banner.jpg" alt="Mandarine" width="640"></p>
+
 # Mandarine
 
 **English** · [Español](README.es.md)
@@ -158,3 +160,5 @@ Mandarine is released under the [MIT License](LICENSE). The bundled tools keep t
 
 Inspired by the workflow of Tangerine for Mac. Mandarine is an independent project with its own code, name and
 artwork, and has no relation to Tangerine or its authors.
+
+Banner photo from [Pexels](https://www.pexels.com/photo/30552332/).

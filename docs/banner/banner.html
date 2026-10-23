@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mandarine banner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=block" rel="stylesheet">
+<style>
+  :root {
+    --ground: #1e0f06;   /* deep peel-brown, from the photo's shadows */
+    --ink: #fbf3e1;      /* cream, ~13:1 against the tinted photo */
+  }
+  * { margin: 0; box-sizing: border-box; }
+  html, body { width: 100vw; height: 100vh; background: var(--ground); overflow: hidden; }
+  .banner { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+  /* Pexels photo 30552332 ("Naranjas"), Pexels License */
+  .photo {
+    position: absolute; inset: -24px;
+    background: url("oranges.jpg") 50% 50% / cover no-repeat;
+    filter: blur(3px) saturate(0.9);
+  }
+  /* flat dark tint: the fruit and the logo share a hue, so the logo needs the photo pushed well back */
+  .tint { position: absolute; inset: 0; background: rgba(28, 12, 4, 0.66); }
+  .lockup {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center; gap: 34px; color: var(--ink);
+  }
+  .logo { width: 138px; height: 138px; flex: none; }
+  h1 {
+    font: 600 124px/1 "Fraunces", serif; letter-spacing: -0.035em;
+    font-variation-settings: "opsz" 144;
+    padding-bottom: 10px; /* optical centre: the descender-less word sits low otherwise */
+  }
+</style>
+</head>
+<body>
+  <div class="banner">
+    <div class="photo"></div>
+    <div class="tint"></div>
+    <div class="lockup">
+      <img class="logo" src="../../src/Mandarine/Assets/mandarine.png" alt="">
+      <h1>Mandarine</h1>
+    </div>
+  </div>
+</body>
+</html>
