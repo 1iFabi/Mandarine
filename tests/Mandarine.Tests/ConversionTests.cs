@@ -177,6 +177,12 @@ public class ConversionTests : IDisposable
         var second = await Converter.ConvertAsync(pdf, Catalog.PdfParts(new[] { (2, 2) }));
         Assert.Equal(".pdf", Path.GetExtension(second));
         Assert.Contains("Segunda", Run(Tools.Exe(Engine.Pdfcraft), "text", second));
+
+        // Organize: the pages in the order given; pages left out are gone.
+        var swapped = Run(Tools.Exe(Engine.Pdfcraft), "text", await Converter.ConvertAsync(pdf, Catalog.PdfOrder(new[] { 2, 1 })));
+        Assert.True(swapped.IndexOf("Segunda") < swapped.IndexOf("Primera"), swapped);
+        var kept = await Converter.ConvertAsync(pdf, Catalog.PdfOrder(new[] { 2 }));
+        Assert.Contains("\"pages\": 1", Run(Tools.Exe(Engine.Pdfcraft), "info", kept));
     }
 
     static double[] FirstPage(string pdf) =>

@@ -53,6 +53,7 @@ public partial class PdfPagesWindow : Window
         {
             case "pdfrotate": BuildRotate(); break;
             case "pdfsplit": BuildSplit(); break;
+            case "pdforganize": BuildOrganize(); break;
             default: throw new ArgumentException(op);
         }
 
@@ -344,6 +345,120 @@ public partial class PdfPagesWindow : Window
 
         SaveButton.Click += (_, _) => { Result = Catalog.PdfParts(parts.Select(r => (r.From, r.To)).ToList()); DialogResult = true; };
         Rebuild();
+    }
+
+    // ---- Organize ----
+
+    /// <summary>Drag pages into a new order; chosen pages can be moved to either end or deleted.</summary>
+    void BuildOrganize()
+    {
+        var n = _pages.Count;
+        var order = Enumerable.Range(0, n).ToList(); // original page indices, as they will be saved
+        var tiles = new ToggleButton[n];
+        for (var i = 0; i < n; i++)
+        {
+            var tile = new ToggleButton { Style = (Style)FindResource("PageTile"), Content = PageView(i, null, out _), Tag = i };
+            AutomationProperties.SetName(tile, $"Página {i + 1}");
+            tile.Click += (_, _) => Refresh();
+            var page = i;
+            tile.MouseDoubleClick += (_, _) => Show(page);
+            Draggable(tile);
+            tiles[i] = tile;
+        }
+
+        List<int> Chosen() => order.Where(i => tiles[i].IsChecked == true).ToList();
+
+        // The moved pages keep their relative order and land before the page at position `at` (counted without them).
+        void Move(List<int> moving, int at)
+        {
+            var rest = order.Where(i => !moving.Contains(i)).ToList();
+            rest.InsertRange(Math.Clamp(at, 0, rest.Count), moving);
+            order.Clear();
+            order.AddRange(rest);
+            Refresh();
+        }
+        void Delete()
+        {
+            var chosen = Chosen();
+            if (chosen.Count == 0 || chosen.Count == order.Count) return; // a PDF needs at least one page
+            order.RemoveAll(chosen.Contains);
+            foreach (var i in chosen) tiles[i].IsChecked = false;
+            Refresh();
+        }
+        void Refresh()
+        {
+            Pages.Children.Clear();
+            foreach (var i in order) Pages.Children.Add(tiles[i]);
+            var chosen = Chosen().Count;
+            var gone = n - order.Count;
+            Hint.Text = chosen == 0
+                ? "Arrastra las páginas para cambiar el orden. Haz clic para elegirlas y moverlas o borrarlas. Doble clic para verla en grande."
+                : $"{PageCount(chosen)} elegida{(chosen == 1 ? "" : "s")}. Arrástralas juntas o usa los botones de la derecha. Supr las borra.";
+            var changed = gone > 0 || order.Where((p, k) => p != k).Any();
+            SaveButton.IsEnabled = changed;
+            Pane.Output(Converter.OutputPath(_pdf, "pdf"), !changed ? "Sin cambios todavía"
+                : gone > 0 ? $"{PageCount(order.Count)} · {gone} borrada{(gone == 1 ? "" : "s")}" : $"{PageCount(order.Count)} · nuevo orden");
+        }
+
+        void Draggable(ToggleButton tile)
+        {
+            Point? down = null;
+            tile.PreviewMouseLeftButtonDown += (_, e) => down = e.GetPosition(Pages);
+            tile.PreviewMouseMove += (_, e) =>
+            {
+                if (down is not { } start || e.LeftButton != MouseButtonState.Pressed) return;
+                var d = e.GetPosition(Pages) - start;
+                if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance) return;
+                down = null;
+                var page = (int)tile.Tag;
+                // Dragging a chosen page carries every chosen page with it.
+                var moving = tile.IsChecked == true ? Chosen() : new List<int> { page };
+                foreach (var i in moving) tiles[i].Opacity = 0.4;
+                DragDrop.DoDragDrop(tile, new DataObject(typeof(List<int>), moving), DragDropEffects.Move);
+                foreach (var i in moving) tiles[i].Opacity = 1;
+            };
+            tile.PreviewMouseLeftButtonUp += (_, _) => down = null;
+        }
+
+        // Where a drop lands: before the first page whose centre is past the pointer, reading row by row.
+        Pages.AllowDrop = true;
+        Pages.Drop += (_, e) =>
+        {
+            if (e.Data.GetData(typeof(List<int>)) is not List<int> moving) return;
+            var p = e.GetPosition(Pages);
+            var at = 0;
+            foreach (var i in order.Where(i => !moving.Contains(i)))
+            {
+                var t = tiles[i];
+                var box = t.TransformToAncestor(Pages).TransformBounds(new Rect(t.RenderSize));
+                var before = p.Y < box.Top || (p.Y <= box.Bottom && p.X < box.Left + box.Width / 2);
+                if (before) break;
+                at++;
+            }
+            Move(moving, at);
+            e.Handled = true;
+        };
+
+        AddControl("Mover las elegidas", Row(Button("Al principio", () => Move(Chosen(), 0)), Button("Al final", () => Move(Chosen(), n))));
+        AddControl("Páginas", Row(Button("Todas", () => { foreach (var t in tiles) t.IsChecked = true; Refresh(); }, "Ctrl+A"),
+            Button("Ninguna", () => { foreach (var t in tiles) t.IsChecked = false; Refresh(); }), Button("Borrar", Delete, "Supr")));
+        AddControl(null, Row(Button("Restablecer", () =>
+        {
+            order.Clear();
+            order.AddRange(Enumerable.Range(0, n));
+            foreach (var t in tiles) t.IsChecked = false;
+            Refresh();
+        }, "Vuelve al orden original, con todas las páginas")));
+        PreviewKeyDown += (_, e) =>
+        {
+            if (Viewer.IsVisible || e.OriginalSource is TextBox) return;
+            if (e.Key == Key.A && Keyboard.Modifiers == ModifierKeys.Control) { foreach (var t in tiles) t.IsChecked = true; Refresh(); }
+            else if (e.Key == Key.Delete) Delete();
+            else return;
+            e.Handled = true;
+        };
+        SaveButton.Click += (_, _) => { Result = Catalog.PdfOrder(order.Select(i => i + 1).ToList()); DialogResult = true; };
+        Refresh();
     }
 
     // ---- Zoom and the large view ----

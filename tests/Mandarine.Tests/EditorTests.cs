@@ -24,7 +24,7 @@ public class EditorTests : IDisposable
         Assert.Contains("Redimensionar", labels);
         Assert.Contains("Fondo", labels);
         Assert.Equal(new[] { "rotate" }, Catalog.ToolsFor(new[] { "clip.mp4" }).Where(t => t.Engine == Engine.Editor).Select(t => t.Args[0]));
-        Assert.Equal(new[] { "pdfrotate", "pdfsplit" }, Catalog.ToolsFor(new[] { "a.pdf" }).Where(t => t.Engine == Engine.Editor).Select(t => t.Args[0]));
+        Assert.Equal(new[] { "pdfrotate", "pdfsplit", "pdforganize" }, Catalog.ToolsFor(new[] { "a.pdf" }).Where(t => t.Engine == Engine.Editor).Select(t => t.Args[0]));
         Assert.Equal("png", ImageEdit.OutputExt("x.webp"));
         Assert.Equal("jpg", ImageEdit.OutputExt("x.JPG"));
     }
@@ -93,6 +93,7 @@ public class EditorTests : IDisposable
     [Theory]
     [InlineData("pdfrotate")]
     [InlineData("pdfsplit")]
+    [InlineData("pdforganize")]
     [InlineData("pdfview")]
     public void Renders_pdf_pages_preview(string shot) => OnSta(() =>
     {
@@ -108,10 +109,10 @@ public class EditorTests : IDisposable
         }
         var pages = PdfPagesWindow.Thumbnails(pdf).GetAwaiter().GetResult();
         if (shot != "pdfview") Assert.Equal(5, pages.Count);
-        var op = shot == "pdfrotate" ? "pdfrotate" : "pdfsplit";
-        var window = new PdfPagesWindow(op, op == "pdfrotate" ? "Rotar" : "Dividir", pdf, pages, "");
+        var op = shot == "pdfview" ? "pdfsplit" : shot;
+        var window = new PdfPagesWindow(op, op switch { "pdfrotate" => "Rotar", "pdforganize" => "Organizar", _ => "Dividir" }, pdf, pages, "");
         var toggles = Descendants(window).OfType<System.Windows.Controls.Primitives.ToggleButton>().ToList();
-        Assert.Equal(op == "pdfrotate" ? 5 : pages.Count - 1, toggles.Count); // a tile per page, or a gap between each two
+        Assert.Equal(op == "pdfsplit" ? pages.Count - 1 : 5, toggles.Count); // a tile per page, or a gap between each two
         Snapshot(window, $"mandarine-editor-{shot}.png", wait: shot == "pdfview" ? 2500 : 400, act: () =>
         {
             if (shot == "pdfview")
@@ -124,10 +125,11 @@ public class EditorTests : IDisposable
                     .RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
                 return;
             }
-            // Rotate: page 2 chosen and turned. Split: a cut after page 2.
+            // Rotate: page 2 chosen and turned. Split: a cut after page 2. Organize: page 2 chosen and sent to the end.
             toggles[1].IsChecked = true;
             toggles[1].RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            if (op == "pdfrotate") Descendants(window).OfType<System.Windows.Controls.Button>().First(b => Equals(b.Content, "90°"))
+            var then = op switch { "pdfrotate" => "90°", "pdforganize" => "Al final", _ => null };
+            if (then != null) Descendants(window).OfType<System.Windows.Controls.Button>().First(b => Equals(b.Content, then))
                 .RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
         });
     });

@@ -122,7 +122,7 @@ public static class Catalog
     // ---- Tools (the Ctrl wheel). Same file type out, except where noted. ----
 
     const string IconCompress = "\uE73F", IconMetadata = "\uE8EC", IconVolume = "\uE767", IconCombine = "\uE81E",
-        IconRotate = "\uE7AD", IconCutout = "\uE8B3", IconText = "\uE8D2", IconSplit = "\uE8C6", IconZip = "\uE7B8", IconUnzip = "\uE8B7";
+        IconRotate = "\uE7AD", IconCutout = "\uE8B3", IconText = "\uE8D2", IconSplit = "\uE8C6", IconOrganize = "\uE8A9", IconZip = "\uE7B8", IconUnzip = "\uE8B7";
     const string Fit2048 = "scale='min(2048,iw)':'min(2048,ih)':force_original_aspect_ratio=decrease";
 
     // Re-encoding drops metadata and bakes in the EXIF rotation (ffmpeg 9 applies it). Each encoder
@@ -173,9 +173,10 @@ public static class Catalog
 
     static readonly Format[] PdfTools =
     {
-        // Both open the page window (PdfPagesWindow), which hands back a PdfRotation or PdfParts.
+        // These open the page window (PdfPagesWindow), which hands back a PdfRotation, PdfParts or PdfOrder.
         new("", "Rotar", new[] { "pdfrotate" }, Engine.Editor, IconRotate),
         new("", "Dividir", new[] { "pdfsplit" }, Engine.Editor, IconSplit),
+        new("", "Organizar", new[] { "pdforganize" }, Engine.Editor, IconOrganize),
         new("", "Texto (OCR)", new[] { "ocr" }, Engine.Builtin, IconText),
         new("", "Comprimir", PdfSteps("{\"tool\":\"doc_reduce\",\"args\":{\"doc\":1,\"path\":{out}}}"), Engine.Pdfcraft, IconCompress),
         new("", "Metadatos", PdfSteps("{\"tool\":\"doc_remove_hidden\",\"args\":{\"doc\":1,\"categories\":[\"metadata\",\"private-data\"]}},{\"tool\":\"doc_save\",\"args\":{\"doc\":1,\"path\":{out}}}"), Engine.Pdfcraft, IconMetadata),
@@ -189,6 +190,10 @@ public static class Catalog
         .Select((d, i) => (Degrees: d % 360, Page: i + 1)).Where(p => p.Degrees != 0).GroupBy(p => p.Degrees)
         .Select(g => "{\"tool\":\"page_rotate\",\"args\":{\"doc\":1,\"degrees\":" + g.Key + ",\"pages\":[" + string.Join(",", g.Select(p => p.Page)) + "]}}")
         .Append(PdfSave))), Engine.Pdfcraft, IconRotate);
+
+    /// <summary>The pages (1-based) in a new order; pages left out are deleted.</summary>
+    public static Format PdfOrder(IReadOnlyList<int> pages) => new("", "Organizar", PdfSteps(
+        "{\"tool\":\"page_extract\",\"args\":{\"doc\":1,\"pages\":[" + string.Join(",", pages) + "],\"out\":{out}}}"), Engine.Pdfcraft, IconOrganize);
 
     /// <summary>A PDF per page range (1-based, inclusive), in order; ranges may skip or repeat pages.</summary>
     public static Format PdfParts(IReadOnlyList<(int From, int To)> parts) => new("", "Dividir", PdfSteps(string.Join(",", parts.Select((p, k) =>

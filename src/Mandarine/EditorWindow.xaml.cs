@@ -21,7 +21,7 @@ public static class Editor
     public static async Task<int> Run(Format tool, string[] files)
     {
         var op = tool.Args[0];
-        if (op is "pdfrotate" or "pdfsplit") return await Pages(op, tool, files);
+        if (op is "pdfrotate" or "pdfsplit" or "pdforganize") return await Pages(op, tool, files);
         if (op == "rotate") return await Rotate(tool, files);
         // Crop, adjustments and frame are set once and applied to every picture (the same share of each);
         // annotations and hidden areas belong to one picture, so each gets its own editor.

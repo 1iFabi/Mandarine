@@ -29,9 +29,28 @@ comparte imágenes, audio, video, PDF y archivos de Office, sin conexión, en Wi
 Requisitos: Windows 10 (versión 2004 o posterior) o Windows 11, de 64 bits. No hay que instalar nada más: .NET y
 todos los conversores vienen dentro del zip.
 
-> **¿"Windows protegió su PC"?** La app todavía no está firmada, así que SmartScreen avisa la primera vez.
-> Haz clic en **Más información → Ejecutar de todas formas**. Puedes comprobar la descarga con el SHA-256 que figura
-> en cada release.
+### "Windows protegió su PC"
+
+La primera vez que abras `Mandarine.exe`, Windows puede mostrar una ventana azul que dice **Windows protegió su PC**.
+No dice que Mandarine sea dañina: dice que el archivo no está **firmado digitalmente**.
+
+- **Qué es la firma.** Un certificado de firma de código es una identificación digital que una empresa compra a una
+  autoridad (DigiCert, Sectigo...) después de demostrar quién es. Windows confía en los programas firmados por el
+  nombre de quien los publica.
+- **Por qué Mandarine no está firmada.** Es un proyecto personal y gratuito, y un certificado cuesta unos cientos de
+  dólares al año. Además, SmartScreen avisa de los programas nuevos sin firma hasta que suficiente gente los descarga.
+- **Cómo saber que tu copia es la original.** Descárgala solo desde la página de
+  [Releases](https://github.com/1iFabi/Mandarine/releases) de este repositorio. Cada release indica el SHA-256 del
+  zip; compáralo en PowerShell:
+
+  ```powershell
+  Get-FileHash .\Mandarine-vX.Y.Z-win-x64.zip
+  ```
+
+  Si el hash coincide, el zip es exactamente el publicado aquí. El código fuente está en este repositorio y la release
+  se compila desde él con `scripts/package.ps1`.
+- **Cómo abrirla.** En la ventana azul haz clic en **Más información** y después en **Ejecutar de todas formas**.
+  Windows recuerda la decisión para esa copia.
 
 Para que arranque con Windows, haz clic derecho en el ícono de la bandeja y marca **Iniciar con Windows**.
 
@@ -74,7 +93,7 @@ Con clic derecho en el ícono de la bandeja están **Rueda oscura**, **Iniciar c
 | Imágenes | **Recortar**, **Anotar** (flecha, rectángulo, lápiz, resaltador, texto), **Ocultar** (pixelar o tapar en negro), **Ajustes** (brillo, contraste, saturación, calidez), **Fondo** (degradado o color, margen, esquinas redondeadas, sombra, proporción), **Redimensionar** (por porcentaje o en píxeles exactos, sin deformar), **Sin fondo**, **Rotar** (90°, 180° o 270°), Comprimir, Metadatos |
 | Audio | Normalizar el volumen, Metadatos |
 | Video | Comprimir, **Rotar** (90°, 180° o 270°), Metadatos |
-| PDF | **Rotar** (todas las páginas o las que elijas), **Dividir** (por rangos de páginas), OCR (vuelve buscables los escaneos; español e inglés), Comprimir, Metadatos, Unir (2 o más PDF) |
+| PDF | **Rotar** (todas las páginas o las que elijas), **Dividir** (por rangos de páginas), **Organizar** (reordenar y borrar páginas), OCR (vuelve buscables los escaneos; español e inglés), Comprimir, Metadatos, Unir (2 o más PDF) |
 | Cualquier cosa | Crear un ZIP (archivos y carpetas); sobre un `.zip`, Extraer |
 
 Los editores de imagen abren una ventana: la imagen a la izquierda, las opciones a la derecha y, debajo, una pestaña
@@ -85,8 +104,10 @@ arrastradas; **Anotar** y **Ocultar** van de a una. Enter guarda, Esc cancela y 
 **Rotar** también abre una ventana para elegir el ángulo. En un PDF muestra las páginas: haz clic en las que quieras
 girar (o en ninguna, para girarlas todas). **Dividir** muestra las páginas y, a la derecha, las partes como rangos
 ("desde la 3 hasta la 7"): escríbelos, corta haciendo clic entre dos páginas o usa **Cada página** y **Por la mitad**.
-Un solo rango extrae esas páginas a un PDF nuevo; varios se guardan en una carpeta junto al original. El tamaño de las
-páginas se cambia a la derecha (o con Ctrl + rueda) y un doble clic muestra una página en grande.
+Un solo rango extrae esas páginas a un PDF nuevo; varios se guardan en una carpeta junto al original. **Organizar**
+muestra las páginas para arrastrarlas a un orden nuevo; haz clic en algunas para elegirlas y mandarlas al principio o al
+final, o bórralas (tecla Supr). El tamaño de las páginas se cambia a la derecha (o con Ctrl + rueda) y un doble clic
+muestra una página en grande.
 
 ### Acciones (Alt)
 
@@ -148,14 +169,14 @@ dotnet run --project src\Mandarine
 ### Crear una release
 
 ```powershell
-.\scripts\package.ps1 -Version 1.0.1
+.\scripts\package.ps1 -Version 1.0.2
 ```
 
 Descarga las herramientas, corre los tests, compila una versión autocontenida, comprueba que estén todas las
-herramientas y genera `dist\Mandarine-v1.0.1-win-x64.zip` con su SHA-256. Después se publica, por ejemplo con GitHub CLI:
+herramientas y genera `dist\Mandarine-v1.0.2-win-x64.zip` con su SHA-256. Después se publica, por ejemplo con GitHub CLI:
 
 ```powershell
-gh release create v1.0.1 dist\Mandarine-v1.0.1-win-x64.zip --title "Mandarine 1.0.1" --notes "SHA-256: <hash>"
+gh release create v1.0.2 dist\Mandarine-v1.0.2-win-x64.zip --title "Mandarine 1.0.2" --notes "SHA-256: <hash>"
 ```
 
 ## Limitaciones conocidas
