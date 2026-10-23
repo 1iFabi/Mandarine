@@ -7,11 +7,18 @@
 Arrastra un archivo, toca **Shift**, **Ctrl** o **Alt** y elige en una rueda. Convierte, comprime, recorta, anota y
 comparte imágenes, audio, video, PDF y archivos de Office, sin conexión, en Windows.
 
-<p align="center">
-  <img src="docs/images/wheel-convert.png" width="210" alt="La rueda de conversión sobre un video, con el logo de Mandarine en el centro">
-  &nbsp;&nbsp;
-  <img src="docs/images/wheel-tools.png" width="210" alt="La rueda de herramientas sobre una foto, apuntando a Anotar">
-</p>
+<table align="center">
+  <tr>
+    <th align="center"><kbd>Shift</kbd> · Convertir</th>
+    <th align="center"><kbd>Ctrl</kbd> · Herramientas</th>
+    <th align="center"><kbd>Alt</kbd> · Acciones</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/wheel-convert.png" width="210" alt="La rueda de conversión sobre un video, apuntando a MKV"></td>
+    <td><img src="docs/images/wheel-tools.png" width="210" alt="La rueda de herramientas sobre una foto, apuntando a Anotar"></td>
+    <td><img src="docs/images/wheel-actions.png" width="210" alt="La rueda de acciones sobre una foto, apuntando a Copiar"></td>
+  </tr>
+</table>
 
 ## Descarga
 

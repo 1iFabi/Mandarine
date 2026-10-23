@@ -15,6 +15,7 @@ public class WheelPreviewTests
     [InlineData("hot", 236, true)]
     [InlineData("dark", 28, true)]
     [InlineData("tools", 120, true)]
+    [InlineData("actions", 120, true)]
     [InlineData("empty", 236, false)]
     public void Renders_wheel_preview(string name, int baseTone, bool pointing)
     {
@@ -25,18 +26,19 @@ public class WheelPreviewTests
             try
             {
                 var tools = name == "tools";
+                var actions = name == "actions";
                 var wheel = new WheelWindow
                 {
-                    AutoHide = false, Mode = tools ? WheelMode.Tools : WheelMode.Convert,
+                    AutoHide = false, Mode = tools ? WheelMode.Tools : actions ? WheelMode.Actions : WheelMode.Convert,
                     Theme = name == "dark" ? WheelTheme.Dark : WheelTheme.Light,
                 };
                 var dpi = VisualTreeHelper.GetDpi(wheel);
                 var side = (int)Math.Round(wheel.Width * dpi.DpiScaleX);
                 wheel.ShowAt(FakeDesktop(side, baseTone), 100, 100);
-                var files = tools ? new[] { "photo.jpg" } : name == "empty" ? new[] { "notes.xyz" } : new[] { "clip.mp4" };
+                var files = tools || actions ? new[] { "photo.jpg" } : name == "empty" ? new[] { "notes.xyz" } : new[] { "clip.mp4" };
                 wheel.ShowTargets(files);
                 // Point at the second segment (clockwise from the top) to render the hot state.
-                var n = (tools ? Catalog.ToolsFor(files) : Catalog.TargetsFor(files)).Count;
+                var n = (tools ? Catalog.ToolsFor(files) : actions ? Catalog.ActionsFor(files) : Catalog.TargetsFor(files)).Count;
                 var a = -Math.PI / 2 + 2 * Math.PI / n;
                 if (pointing) wheel.PointAt(new Point(105 + 66 * Math.Cos(a), 105 + 66 * Math.Sin(a)));
                 // Let the entrance animation finish before snapshotting.

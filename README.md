@@ -7,11 +7,18 @@
 Drag a file, tap **Shift**, **Ctrl** or **Alt**, and pick from a wheel. Convert, compress, crop, annotate and share
 images, audio, video, PDFs and Office files, offline, on Windows.
 
-<p align="center">
-  <img src="docs/images/wheel-convert.png" width="210" alt="The conversion wheel over a video file, with the Mandarine logo in the centre">
-  &nbsp;&nbsp;
-  <img src="docs/images/wheel-tools.png" width="210" alt="The tools wheel over a photo, pointing at Annotate">
-</p>
+<table align="center">
+  <tr>
+    <th align="center"><kbd>Shift</kbd> · Convert</th>
+    <th align="center"><kbd>Ctrl</kbd> · Tools</th>
+    <th align="center"><kbd>Alt</kbd> · Actions</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/wheel-convert.png" width="210" alt="The conversion wheel over a video, pointing at MKV"></td>
+    <td><img src="docs/images/wheel-tools.png" width="210" alt="The tools wheel over a photo, pointing at Annotate"></td>
+    <td><img src="docs/images/wheel-actions.png" width="210" alt="The actions wheel over a photo, pointing at Copy"></td>
+  </tr>
+</table>
 
 ## Download
 
