@@ -32,6 +32,7 @@ public static class Tools
     {
         "ocr" => Ocr.Available,
         "removebg" => Background.Available,
+        "sheettxt" or "sheetmd" => Has(Engine.Gridcraft),
         _ => true,
     };
 
@@ -108,6 +109,8 @@ public static class Converter
                 return folder;
             case "ocr": await Ocr.SearchablePdf(inputs[0], output); return output;
             case "removebg": await Background.Remove(inputs[0], output); return output;
+            case "sheettxt": await SheetText.Txt(inputs[0], output); return output;
+            case "sheetmd": await SheetText.Markdown(inputs[0], output); return output;
             default: throw new ArgumentException(op);
         }
     }

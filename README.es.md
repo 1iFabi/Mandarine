@@ -63,7 +63,7 @@ Con clic derecho en el ícono de la bandeja están **Rueda oscura**, **Iniciar c
 | Audio: MP3, M4A, AAC, WAV, FLAC, OGG, Opus, AIFF, WMA | MP3, M4A, WAV, FLAC, OGG, Opus, AIFF, WMA |
 | Video: MP4, M4V, MOV, MKV, WebM, AVI, WMV, GIF | MP4, MOV, MKV, WebM, AVI, WMV, GIF |
 | Documentos: DOCX, DOC, ODT, RTF, HTML, Markdown, TeX, TXT | PDF, DOCX, ODT, RTF, MD, HTML, TXT |
-| Planillas: XLSX, XLS, ODS, CSV, TSV | PDF (columnas ajustadas al contenido), XLSX, CSV, TSV, HTML |
+| Planillas: XLSX, XLS, ODS, CSV, TSV | PDF (columnas ajustadas al contenido), XLSX, CSV, TSV, HTML, TXT (tabla alineada), MD (tabla Markdown); una sección por hoja |
 | Presentaciones: PPTX, PPSX, POTX | PDF, PNG, JPG, GIF, MD, TXT |
 | PDF | DOCX, PPTX (una diapositiva por página), PNG / JPG (una imagen por página), TXT, HTML, RTF |
 

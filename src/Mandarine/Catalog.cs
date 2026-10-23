@@ -84,6 +84,8 @@ public static class Catalog
         new("csv", "CSV", CraftConvert, Engine.Gridcraft),
         new("tsv", "TSV", CraftConvert, Engine.Gridcraft),
         new("html", "HTML", CraftConvert, Engine.Gridcraft),
+        new("txt", "TXT", new[] { "sheettxt" }, Engine.Builtin), // an aligned table per sheet
+        new("md", "MD", new[] { "sheetmd" }, Engine.Builtin),
     };
 
     // Presentations through deckcraft-cli. Images show the first slide; GIF plays one frame per slide.

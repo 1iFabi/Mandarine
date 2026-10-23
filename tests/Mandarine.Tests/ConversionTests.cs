@@ -83,10 +83,21 @@ public class ConversionTests : IDisposable
         var csv = Path.Combine(_dir, "ventas.csv");
         File.WriteAllText(csv, "Región,Q2,Q3\nNorte,1200,1450\n\"Sur, con coma\",980,1010\n");
         var targets = Catalog.TargetsFor(new[] { csv });
-        Assert.Equal(new[] { "pdf", "xlsx", "tsv", "html" }, targets.Select(f => f.Ext));
+        Assert.Equal(new[] { "pdf", "xlsx", "tsv", "html", "txt", "md" }, targets.Select(f => f.Ext));
         foreach (var target in targets)
             Assert.True(new FileInfo(await Converter.ConvertAsync(csv, target)).Length > 0, $"csv -> {target.Ext}");
         Assert.Contains("Sur, con coma\t980", File.ReadAllText(Path.Combine(_dir, "ventas.tsv")));
+        var txt = File.ReadAllLines(Path.Combine(_dir, "ventas.txt"));
+        Assert.Equal(txt[1].IndexOf("1200") + 4, txt[2].IndexOf("980") + 3); // numbers right-aligned in one column
+        Assert.Equal("| Región | Q2 | Q3 |\r\n| --- | ---: | ---: |\r\n| Norte | 1200 | 1450 |\r\n| Sur, con coma | 980 | 1010 |\r\n\r\n",
+            File.ReadAllText(Path.Combine(_dir, "ventas.md")));
+    }
+
+    [Fact]
+    public void Markdown_tables_escape_and_split_sheets()
+    {
+        var md = SheetText.ToMarkdown(new[] { ("Uno", "a,b\n\"x|y\",\"dos\nlíneas\"\n"), ("Dos", "c\n1\n") });
+        Assert.Equal("## Uno\r\n\r\n| a | b |\r\n| --- | --- |\r\n| x\\|y | dos<br>líneas |\r\n\r\n## Dos\r\n\r\n| c |\r\n| ---: |\r\n| 1 |\r\n\r\n", md);
     }
 
     [Fact]

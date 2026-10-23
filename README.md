@@ -65,7 +65,7 @@ Right-click the tray icon for **Rueda oscura** (dark wheel), **Iniciar con Windo
 | Audio: MP3, M4A, AAC, WAV, FLAC, OGG, Opus, AIFF, WMA | MP3, M4A, WAV, FLAC, OGG, Opus, AIFF, WMA |
 | Video: MP4, M4V, MOV, MKV, WebM, AVI, WMV, GIF | MP4, MOV, MKV, WebM, AVI, WMV, GIF |
 | Documents: DOCX, DOC, ODT, RTF, HTML, Markdown, TeX, TXT | PDF, DOCX, ODT, RTF, MD, HTML, TXT |
-| Spreadsheets: XLSX, XLS, ODS, CSV, TSV | PDF (columns fitted to their content), XLSX, CSV, TSV, HTML |
+| Spreadsheets: XLSX, XLS, ODS, CSV, TSV | PDF (columns fitted to their content), XLSX, CSV, TSV, HTML, TXT (aligned table), MD (Markdown table); one section per sheet |
 | Presentations: PPTX, PPSX, POTX | PDF, PNG, JPG, GIF, MD, TXT |
 | PDF | DOCX, PPTX (one slide per page), PNG / JPG (one image per page), TXT, HTML, RTF |
 
