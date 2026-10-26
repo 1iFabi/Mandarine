@@ -14,9 +14,9 @@ comparte imágenes, audio, video, PDF y archivos de Office, sin conexión, en Wi
     <th align="center"><kbd>Alt</kbd> · Acciones</th>
   </tr>
   <tr>
-    <td><img src="docs/images/wheel-convert.png" width="210" alt="La rueda de conversión sobre un video, apuntando a MKV"></td>
-    <td><img src="docs/images/wheel-tools.png" width="210" alt="La rueda de herramientas sobre una foto, apuntando a Anotar"></td>
-    <td><img src="docs/images/wheel-actions.png" width="210" alt="La rueda de acciones sobre una foto, apuntando a Copiar"></td>
+    <td><img src="docs/images/wheel-convert.png" width="210" alt="La rueda de conversión para un video, apuntando a MKV"></td>
+    <td><img src="docs/images/wheel-tools.png" width="210" alt="La rueda de herramientas para una foto, apuntando a Comprimir"></td>
+    <td><img src="docs/images/wheel-actions.png" width="210" alt="La rueda de acciones para una foto, apuntando a Copiar"></td>
   </tr>
 </table>
 
@@ -24,7 +24,8 @@ comparte imágenes, audio, video, PDF y archivos de Office, sin conexión, en Wi
 
 1. Entra en [Releases](https://github.com/1iFabi/Mandarine/releases) y descarga `Mandarine-vX.Y.Z-win-x64.zip`.
 2. Descomprímelo donde quieras (por ejemplo `C:\Programas\Mandarine`) y abre `Mandarine.exe`.
-3. Aparece una mandarina en el área de notificación. Listo: Mandarine queda esperando en segundo plano.
+3. Aparece una mandarina en el área de notificación y una guía corta muestra cada gesto en movimiento; después lo
+   pruebas con una foto de ejemplo. Puedes volver a abrirla cuando quieras desde el menú del ícono, en **Cómo se usa**.
 
 Requisitos: Windows 10 (versión 2004 o posterior) o Windows 11, de 64 bits. No hay que instalar nada más: .NET y
 todos los conversores vienen dentro del zip.
@@ -90,7 +91,7 @@ Con clic derecho en el ícono de la bandeja están **Rueda oscura**, **Iniciar c
 
 | Para | Herramientas |
 |---|---|
-| Imágenes | **Recortar**, **Anotar** (flecha, rectángulo, lápiz, resaltador, texto), **Ocultar** (pixelar o tapar en negro), **Ajustes** (brillo, contraste, saturación, calidez), **Fondo** (degradado o color, margen, esquinas redondeadas, sombra, proporción), **Redimensionar** (por porcentaje o en píxeles exactos, sin deformar), **Sin fondo**, **Rotar** (90°, 180° o 270°), Comprimir, Metadatos |
+| Imágenes | **Recortar**, **Anotar** (flecha, rectángulo, lápiz, resaltador, texto), **Ocultar** (pixelar o tapar en negro), **Ajustes** (brillo, contraste, saturación, calidez), **Fondo** (degradado o color, margen, esquinas redondeadas, sombra, proporción), **Redimensionar** (por porcentaje o en píxeles exactos, sin deformar), **Escanear** (foto de un papel → PDF escaneado), **Sin fondo**, **Rotar** (90°, 180° o 270°), Comprimir, Metadatos |
 | Audio | Normalizar el volumen, Metadatos |
 | Video | Comprimir, **Rotar** (90°, 180° o 270°), Metadatos |
 | PDF | **Rotar** (todas las páginas o las que elijas), **Dividir** (por rangos de páginas), **Organizar** (reordenar y borrar páginas), OCR (vuelve buscables los escaneos; español e inglés), Comprimir, Metadatos, Unir (2 o más PDF) |
@@ -100,6 +101,10 @@ Los editores de imagen abren una ventana: la imagen a la izquierda, las opciones
 que dice qué archivo se va a escribir, con qué tamaño y en qué carpeta. **Recortar** (arrastrando o escribiendo el área
 en píxeles), **Ajustes**, **Fondo** y **Redimensionar** se configuran una vez y se aplican a todas las imágenes
 arrastradas; **Anotar** y **Ocultar** van de a una. Enter guarda, Esc cancela y Ctrl+Z deshace.
+
+**Escanear** convierte fotos de hojas de papel en un PDF que parece escaneado: encuentra la hoja (puedes arrastrar
+sus cuatro esquinas), la endereza, quita sombras y luz amarilla y la deja en tamaño A4. Elige Color, Gris o B/N y, si
+quieres, texto buscable (OCR). Varias fotos van una por una y salen en un solo PDF, una página por foto.
 
 **Rotar** también abre una ventana para elegir el ángulo. En un PDF muestra las páginas: haz clic en las que quieras
 girar (o en ninguna, para girarlas todas). **Dividir** muestra las páginas y, a la derecha, las partes como rangos

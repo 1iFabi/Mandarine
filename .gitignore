@@ -6,3 +6,4 @@ dist/
 docs/ANALISIS.md
 .impeccable/*
 !.impeccable/surfaces/
+.superpowers/

@@ -14,9 +14,9 @@ images, audio, video, PDFs and Office files, offline, on Windows.
     <th align="center"><kbd>Alt</kbd> · Actions</th>
   </tr>
   <tr>
-    <td><img src="docs/images/wheel-convert.png" width="210" alt="The conversion wheel over a video, pointing at MKV"></td>
-    <td><img src="docs/images/wheel-tools.png" width="210" alt="The tools wheel over a photo, pointing at Annotate"></td>
-    <td><img src="docs/images/wheel-actions.png" width="210" alt="The actions wheel over a photo, pointing at Copy"></td>
+    <td><img src="docs/images/wheel-convert.png" width="210" alt="The conversion wheel for a video, pointing at MKV"></td>
+    <td><img src="docs/images/wheel-tools.png" width="210" alt="The tools wheel for a photo, pointing at Compress"></td>
+    <td><img src="docs/images/wheel-actions.png" width="210" alt="The actions wheel for a photo, pointing at Copy"></td>
   </tr>
 </table>
 
@@ -24,7 +24,8 @@ images, audio, video, PDFs and Office files, offline, on Windows.
 
 1. Open [Releases](https://github.com/1iFabi/Mandarine/releases) and download `Mandarine-vX.Y.Z-win-x64.zip`.
 2. Unzip it anywhere (for example `C:\Programs\Mandarine`) and run `Mandarine.exe`.
-3. A tangerine icon appears in the notification area. That's it: Mandarine waits in the background.
+3. A tangerine icon appears in the notification area, and a short guide plays each gesture, then lets you try it on
+   a sample photo. Open it again any time from the icon's menu (**Cómo se usa**).
 
 Requirements: Windows 10 (version 2004 or later) or Windows 11, 64-bit. Nothing else to install: .NET and every
 converter come inside the zip.
@@ -92,7 +93,7 @@ Right-click the tray icon for **Rueda oscura** (dark wheel), **Iniciar con Windo
 
 | For | Tools |
 |---|---|
-| Images | **Crop**, **Annotate** (arrow, box, pen, highlighter, text), **Hide** (pixelate or black out), **Adjust** (brightness, contrast, saturation, warmth), **Background** (gradient or colour, margin, rounded corners, shadow, canvas ratio), **Resize** (by percentage or exact pixels, keeping the proportion), **Remove background**, **Rotate** (90°, 180° or 270°), Compress, Remove metadata |
+| Images | **Crop**, **Annotate** (arrow, box, pen, highlighter, text), **Hide** (pixelate or black out), **Adjust** (brightness, contrast, saturation, warmth), **Background** (gradient or colour, margin, rounded corners, shadow, canvas ratio), **Resize** (by percentage or exact pixels, keeping the proportion), **Scan** (photo of a sheet of paper → scanned PDF), **Remove background**, **Rotate** (90°, 180° or 270°), Compress, Remove metadata |
 | Audio | Normalize loudness, Remove metadata |
 | Video | Compress, **Rotate** (90°, 180° or 270°), Remove metadata |
 | PDF | **Rotate** (every page or the ones you pick), **Split** (by page ranges), **Organize** (reorder and delete pages), OCR (makes scans searchable; Spanish and English), Compress, Remove metadata, Merge (2+ PDFs) |
@@ -102,6 +103,10 @@ The image editors open a window: the picture on the left, the options on the rig
 the file about to be written, its size and its folder. **Crop** (drag, or type the area in pixels), **Adjust**,
 **Background** and **Resize** are set once and applied to every dragged picture; **Annotate** and **Hide** go one picture
 at a time. Enter saves, Esc cancels, Ctrl+Z undoes.
+
+**Scan** turns photos of paper into a PDF that looks scanned: it finds the sheet (drag its four corners to adjust),
+squares it up, removes shadows and yellow light and sizes it to A4. Pick Color, Gray or B/W and, optionally,
+searchable text (OCR). Several photos go one at a time and become one PDF, a page per photo.
 
 **Rotate** opens a window too, to pick the angle. On a PDF it shows the pages: click the ones to turn (or none, to
 turn them all). **Split** shows the pages and, on the right, the parts as page ranges ("from 3 to 7"): type them, click
