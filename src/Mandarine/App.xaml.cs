@@ -13,18 +13,26 @@ public partial class App : System.Windows.Application
     Forms.NotifyIcon? _tray;
     KeyboardHook? _hook;
     WheelWindow? _wheel;
+    NoticeWindow? _notice;
+    GuideWindow? _guide;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
         _wheel = new WheelWindow();
+        _notice = new NoticeWindow();
         _wheel.Converted += (files, format) =>
         {
+            GuideWindow.Landed(_guide, files);
             // After the drop has returned: the editor's window must not hold up the app the drag came from.
             if (format.Engine == Engine.Editor) { Dispatcher.BeginInvoke(() => _ = EditAll(files, format)); return; }
             if (format.Engine != Engine.Action) { _ = ConvertAll(files, format); return; }
-            try { Actions.Run(format.Args[0], files); }
-            catch (Exception ex) { Notify(format.Label, ex.Message, Forms.ToolTipIcon.Error); }
+            // After the drop has returned too: a folder picker must not open inside a drag our own guide started.
+            Dispatcher.BeginInvoke(() =>
+            {
+                try { if (Actions.Run(format.Args[0], files)) GuideWindow.Apply(_guide, files, format); }
+                catch (Exception ex) { Present(Notice.Failed(1, 1, ex.Message, files.Length == 1 ? Path.GetFileName(files[0]) : null, Notice.VerbFor(format))); }
+            });
         };
 
         _hook = new KeyboardHook();
@@ -37,8 +45,13 @@ public partial class App : System.Windows.Application
         _hook.Escape += () => Dispatcher.BeginInvoke(() => _wheel.HideWheel());
 
         var menu = new Forms.ContextMenuStrip();
+        menu.Items.Add("Cómo se usa", null, (_, _) => OpenGuide());
+        bool seen;
         using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Mandarine"))
+        {
             _wheel.Theme = key.GetValue("DarkWheel") is 1 ? WheelTheme.Dark : WheelTheme.Light;
+            seen = Practice.IsSeen(key);
+        }
         var dark = new Forms.ToolStripMenuItem("Rueda oscura") { Checked = _wheel.Theme == WheelTheme.Dark, CheckOnClick = true };
         dark.CheckedChanged += (_, _) =>
         {
@@ -74,30 +87,45 @@ public partial class App : System.Windows.Application
             ContextMenuStrip = menu,
             Visible = true,
         };
-        Notify("Mandarine está listo", "Arrastra un archivo y, sin soltarlo, toca Shift.");
+        if (!seen) OpenGuide();
+    }
+
+    /// <summary>One guide at a time: asking again brings the open one forward.</summary>
+    void OpenGuide()
+    {
+        if (_guide != null) { _guide.Activate(); return; }
+        _guide = new GuideWindow();
+        _guide.Finished += () =>
+        {
+            using (var key = Registry.CurrentUser.CreateSubKey(@"Software\Mandarine")) Practice.MarkSeen(key);
+            _guide?.Close();
+        };
+        _guide.Closed += (_, _) => _guide = null;
+        _guide.Show();
     }
 
     async Task ConvertAll(string[] files, Format format)
     {
         // Sequential: same-named files (a.png + a.jpg -> a.webp) would race for the output name.
         var errors = new System.Collections.Generic.List<string>();
+        var outputs = new System.Collections.Generic.List<string>();
         if (format.Combines)
         {
-            try { await Converter.CombineAsync(files, format); }
+            try { outputs.Add(await Converter.CombineAsync(files, format)); }
             catch (Exception ex) { errors.Add(ex.Message); }
         }
         else
             foreach (var f in files)
             {
-                try { await Converter.ConvertAsync(f, format); }
+                try { outputs.Add(await Converter.ConvertAsync(f, format)); }
                 catch (Exception ex) { errors.Add($"{Path.GetFileName(f)}: {ex.Message}"); }
             }
-        if (errors.Count == 0)
-            Notify("Listo", format.Icon != null
-                ? $"{format.Label}: {files.Length} archivo(s)."
-                : $"{files.Length} archivo(s) convertido(s) a {format.Label}.");
-        else
-            Notify($"Fallaron {errors.Count} de {files.Length}", string.Join("\n", errors), Forms.ToolTipIcon.Error);
+        // A combine is one job however many files went in.
+        var total = format.Combines ? 1 : files.Length;
+        if (errors.Count == 0) GuideWindow.Apply(_guide, files, format);
+        Present(errors.Count == 0
+            ? Notice.Done(outputs)
+            : Notice.Failed(errors.Count, total, string.Join("\n", errors), files.Length == 1 ? Path.GetFileName(files[0]) : null, Notice.VerbFor(format)));
     }
 
     async Task EditAll(string[] files, Format format)
@@ -105,13 +133,13 @@ public partial class App : System.Windows.Application
         try
         {
             var saved = await Editor.Run(format, files);
-            if (saved > 0) Notify("Listo", $"{format.Label}: {saved} archivo(s).");
+            if (saved.Count > 0) { Present(Notice.Done(saved)); GuideWindow.Apply(_guide, files, format); }
         }
-        catch (Exception ex) { Notify(format.Label, ex.Message, Forms.ToolTipIcon.Error); }
+        catch (Exception ex) { Present(Notice.Failed(1, 1, ex.Message, files.Length == 1 ? Path.GetFileName(files[0]) : null, Notice.VerbFor(format))); }
     }
 
-    void Notify(string title, string text, Forms.ToolTipIcon icon = Forms.ToolTipIcon.Info) =>
-        Dispatcher.Invoke(() => _tray?.ShowBalloonTip(4000, title, text.Length > 250 ? text[..250] + "…" : text, icon));
+    void Present(Notice n) => Dispatcher.Invoke(() => _notice?.Present(n));
+
 
     protected override void OnExit(ExitEventArgs e)
     {

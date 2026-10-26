@@ -10,8 +10,8 @@ namespace Mandarine;
 /// <summary>The Alt wheel: things done with files rather than to them. Nothing is written beside the originals.</summary>
 public static class Actions
 {
-    /// <summary>Runs on the UI thread: the clipboard and the folder picker need it.</summary>
-    public static void Run(string action, string[] files)
+    /// <summary>Runs on the UI thread: the clipboard and the folder picker need it. False when the person cancelled.</summary>
+    public static bool Run(string action, string[] files)
     {
         switch (action)
         {
@@ -28,7 +28,7 @@ public static class Actions
                 break;
             case "move":
                 var picker = new Microsoft.Win32.OpenFolderDialog { Title = "Mover a…" };
-                if (picker.ShowDialog() != true) return;
+                if (picker.ShowDialog() != true) return false;
                 foreach (var f in files)
                 {
                     var dest = Path.Combine(picker.FolderName, Path.GetFileName(f));
@@ -36,7 +36,7 @@ public static class Actions
                     if (Directory.Exists(f)) FileSystem.MoveDirectory(f, dest, UIOption.AllDialogs, UICancelOption.DoNothing);
                     else FileSystem.MoveFile(f, dest, UIOption.AllDialogs, UICancelOption.DoNothing);
                 }
-                break;
+                return Moved(files);
             case "terminal":
                 var folder = Directory.Exists(files[0]) ? files[0] : Path.GetDirectoryName(files[0])!;
                 // The folder goes in as the working directory, never on wt's command line, where ";" starts a new command.
@@ -52,5 +52,9 @@ public static class Actions
             default:
                 throw new ArgumentException(action);
         }
+        return true;
     }
+
+    /// <summary>At least one source is gone: Windows' prompt can skip every file without telling us.</summary>
+    public static bool Moved(string[] files) => files.Any(f => !File.Exists(f) && !Directory.Exists(f));
 }

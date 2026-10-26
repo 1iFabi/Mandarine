@@ -1,0 +1,60 @@
+<Window x:Class="Mandarine.GuideWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Mandarine"
+        Title="Cómo se usa Mandarine" Width="860" Height="600" ResizeMode="NoResize"
+        Background="#F3F3F3" WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13" Foreground="#1C1C1E"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
+    <Window.Resources>
+        <ResourceDictionary Source="EditorStyles.xaml" />
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- One step at a time: name and progress on top, the gesture on the stage, what to do now at the foot. -->
+        <Border DockPanel.Dock="Top" Height="64" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="20,0">
+            <DockPanel>
+                <Image x:Name="Logo" Width="36" Height="36" VerticalAlignment="Center" />
+                <StackPanel x:Name="Pips" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" />
+                <StackPanel VerticalAlignment="Center" Margin="12,0,0,0">
+                    <TextBlock Text="Cómo se usa Mandarine" FontWeight="SemiBold" />
+                    <TextBlock Text="Tres gestos, uno a la vez" Style="{StaticResource Caption}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+        <Border DockPanel.Dock="Bottom" Background="{StaticResource Manila}" BorderBrush="{StaticResource ManilaLine}" BorderThickness="0,1,0,0" Padding="20,10">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="SkipButton" x:FieldModifier="public" Content="Saltar" Style="{StaticResource TabAction}" MinWidth="88" />
+                    <Button x:Name="NextButton" x:FieldModifier="public" Content="Siguiente" Style="{StaticResource Primary}" MinWidth="88" Margin="8,0,0,0" />
+                </StackPanel>
+                <TextBlock x:Name="Footer" Foreground="{StaticResource ManilaInk}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </DockPanel>
+        </Border>
+
+        <Grid x:Name="Stage" ClipToBounds="True">
+            <StackPanel x:Name="StepTitle" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,22,0,0">
+                <StackPanel.RenderTransform><TranslateTransform x:Name="TitleMove" /></StackPanel.RenderTransform>
+                <TextBlock x:Name="StepName" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock x:Name="StepWhat" Style="{StaticResource Caption}" HorizontalAlignment="Center" Margin="0,2,0,0" />
+            </StackPanel>
+            <!-- The real file: dragging it starts a real Windows drag, so the wheel treats it like any file. -->
+            <StackPanel x:Name="Sample" HorizontalAlignment="Center" VerticalAlignment="Center" Cursor="Hand" Background="Transparent"
+                        ToolTip="Arrástrala sin soltar">
+                <Grid>
+                    <Border Width="96" Height="72" CornerRadius="6" ClipToBounds="True" BorderBrush="{StaticResource Control}" BorderThickness="1">
+                        <Image x:Name="Thumb" Stretch="UniformToFill" />
+                    </Border>
+                    <Border x:Name="Check" Width="28" Height="28" CornerRadius="14" Background="{StaticResource Accent}"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-12,-12,0" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform><ScaleTransform x:Name="CheckScale" /></Border.RenderTransform>
+                        <TextBlock Text="✓" FontWeight="SemiBold" Foreground="{StaticResource Ink}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                </Grid>
+                <TextBlock Text="mandarina.jpg" HorizontalAlignment="Center" Margin="0,6,0,0" />
+            </StackPanel>
+            <StackPanel x:Name="Keys" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,22" />
+            <local:GuideDemo x:Name="Demo" x:FieldModifier="public" />
+        </Grid>
+    </DockPanel>
+</Window>
