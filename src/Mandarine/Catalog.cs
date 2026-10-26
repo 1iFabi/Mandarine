@@ -143,6 +143,7 @@ public static class Catalog
         new("", "Ajustes", new[] { "adjust" }, Engine.Editor, ""),
         new("", "Fondo", new[] { "frame" }, Engine.Editor, ""),
         new("", "Redimensionar", new[] { "resize" }, Engine.Editor, "\uE740"),
+        new("", "Escanear", new[] { "scan" }, Engine.Editor, "\uE8FE"),
     };
 
     static readonly Format[] JpegPngTools = Editors.Concat(new[] { RemoveBackground, Rotate, CompressImage, StripImage }).ToArray();

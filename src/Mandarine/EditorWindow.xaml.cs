@@ -17,29 +17,32 @@ namespace Mandarine;
 /// <summary>Opens the picture editors for dropped files and saves the results beside them.</summary>
 public static class Editor
 {
-    /// <summary>Returns how many pictures were saved; stops at the first cancel.</summary>
-    public static async Task<int> Run(Format tool, string[] files)
+    /// <summary>Returns the paths written, in order; stops at the first cancel.</summary>
+    public static async Task<IReadOnlyList<string>> Run(Format tool, string[] files)
     {
         var op = tool.Args[0];
         if (op is "pdfrotate" or "pdfsplit" or "pdforganize") return await Pages(op, tool, files);
         if (op == "rotate") return await Rotate(tool, files);
+        if (op == "scan") return await ScanPages(tool, files);
         // Crop, adjustments and frame are set once and applied to every picture (the same share of each);
         // annotations and hidden areas belong to one picture, so each gets its own editor.
         var shared = op is "crop" or "adjust" or "frame" or "resize";
         Func<BitmapSource, BitmapSource>? apply = null;
-        var saved = 0;
+        var saved = new List<string>();
         for (var i = 0; i < files.Length; i++)
         {
             var picture = await ImageEdit.Load(files[i]);
+            // One name per picture: asking again after saving would pick the next free one.
+            var output = Converter.OutputPath(files[i], OutputExt(op, files[i]));
             if (apply == null || !shared)
             {
                 var progress = files.Length == 1 ? "" : shared ? $"Se aplicará a {files.Length} imágenes" : $"{i + 1} de {files.Length}";
-                var editor = new EditorWindow(op, tool.Label, picture, files[i], Converter.OutputPath(files[i], OutputExt(op, files[i])), progress);
+                var editor = new EditorWindow(op, tool.Label, picture, files[i], output, progress);
                 if (editor.ShowDialog() != true) return saved;
                 apply = editor.Result!;
             }
-            ImageEdit.Save(apply(picture), Converter.OutputPath(files[i], OutputExt(op, files[i])));
-            saved++;
+            ImageEdit.Save(apply(picture), output);
+            saved.Add(output);
         }
         return saved;
     }
@@ -47,27 +50,47 @@ public static class Editor
     static string OutputExt(string op, string file) => op == "frame" ? "png" : ImageEdit.OutputExt(file);
 
     /// <summary>One angle for every picture or video, previewed on the first; ffmpeg does the turning.</summary>
-    static async Task<int> Rotate(Format tool, string[] files)
+    static async Task<IReadOnlyList<string>> Rotate(Format tool, string[] files)
     {
         var progress = files.Length == 1 ? "" : $"Se aplicará a {files.Length} archivos";
         var ext = Catalog.Rotation(files[0], 90).Ext is { Length: > 0 } e ? e : System.IO.Path.GetExtension(files[0]).TrimStart('.');
         var editor = new EditorWindow("rotate", tool.Label, await ImageEdit.Load(files[0]), files[0], Converter.OutputPath(files[0], ext), progress);
-        if (editor.ShowDialog() != true) return 0;
-        foreach (var f in files) await Converter.ConvertAsync(f, Catalog.Rotation(f, editor.Degrees));
-        return files.Length;
+        if (editor.ShowDialog() != true) return Array.Empty<string>();
+        var saved = new List<string>();
+        foreach (var f in files) saved.Add(await Converter.ConvertAsync(f, Catalog.Rotation(f, editor.Degrees)));
+        return saved;
+    }
+
+    /// <summary>Each photo gets its own corners (every sheet lies differently); the pages become one PDF beside the first photo.</summary>
+    static async Task<IReadOnlyList<string>> ScanPages(Format tool, string[] files)
+    {
+        var output = Converter.OutputPath(files[0], "pdf");
+        var jpegs = new List<byte[]>();
+        var readText = false;
+        for (var i = 0; i < files.Length; i++)
+        {
+            var picture = await ImageEdit.Load(files[i]);
+            var progress = files.Length == 1 ? "" : $"Página {i + 1} de {files.Length}";
+            var editor = new EditorWindow("scan", tool.Label, picture, files[i], output, progress);
+            if (editor.ShowDialog() != true) return Array.Empty<string>();
+            var (apply, mode) = (editor.Result!, editor.Mode);
+            jpegs.Add(await Task.Run(() => Scan.Jpeg(apply(picture), mode)));
+            readText = editor.ReadText;
+        }
+        await Ocr.ScannedPdf(jpegs, output, readText && Ocr.Available);
+        return new[] { output };
     }
 
     /// <summary>The PDF page window, one document at a time: pages differ from file to file.</summary>
-    static async Task<int> Pages(string op, Format tool, string[] files)
+    static async Task<IReadOnlyList<string>> Pages(string op, Format tool, string[] files)
     {
-        var saved = 0;
+        var saved = new List<string>();
         for (var i = 0; i < files.Length; i++)
         {
             var progress = files.Length == 1 ? "" : $"{i + 1} de {files.Length}";
             var window = new PdfPagesWindow(op, tool.Label, files[i], await PdfPagesWindow.Thumbnails(files[i]), progress);
             if (window.ShowDialog() != true) return saved;
-            await Converter.ConvertAsync(files[i], window.Result!);
-            saved++;
+            saved.Add(await Converter.ConvertAsync(files[i], window.Result!));
         }
         return saved;
     }
@@ -104,6 +127,10 @@ public partial class EditorWindow : Window
 
     /// <summary>Rotate only: the chosen clockwise turn.</summary>
     public int Degrees { get; private set; } = 90;
+
+    /// <summary>Scan only: how the page is cleaned, and whether its text is made searchable.</summary>
+    public ScanMode Mode { get; private set; } = ScanMode.Gray;
+    public bool ReadText { get; private set; }
 
     Button SaveButton => Pane.SaveButton;
     Button CancelButton => Pane.CancelButton;
@@ -142,6 +169,7 @@ public partial class EditorWindow : Window
             case "frame": BuildFrame(); break;
             case "rotate": BuildRotate(); break;
             case "resize": BuildResize(); break;
+            case "scan": BuildScan(); break;
             default: throw new ArgumentException(op);
         }
         if (Hint.Text.Length == 0) Hint.Visibility = Visibility.Collapsed;
@@ -585,6 +613,76 @@ public partial class EditorWindow : Window
         AddControl(null, new TextBlock { Text = $"Original: {Px(_pw, _ph)}", Style = (Style)FindResource("Caption") });
         Show();
         _finish = () => { var scale = k; return p => ImageEdit.Resize(p, scale); };
+    }
+
+    // ---- Scan ----
+
+    void BuildScan()
+    {
+        Hint.Text = "Arrastra las esquinas hasta los bordes del papel.";
+        var corners = Scan.FindPage(_source).Select(c => new Point(c.X * _pw, c.Y * _ph)).ToArray();
+        var dim = new Path { Fill = Frozen(new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0))), IsHitTestVisible = false };
+        var outline = new Polygon { Stroke = (Brush)FindResource("Accent"), IsHitTestVisible = false };
+        var handles = Enumerable.Range(0, 4).Select(_ => new Ellipse { Fill = Brushes.White, Stroke = (Brush)FindResource("Accent"), IsHitTestVisible = false }).ToArray();
+        _overlay.Children.Add(dim);
+        _overlay.Children.Add(outline);
+        foreach (var h in handles) _overlay.Children.Add(h);
+        _overlay.Cursor = Cursors.Hand;
+        _detail = () => "PDF · A4";
+
+        var small = ImageEdit.Scaled(_source, 900); // the live preview; the full photo is processed on save
+        var preview = new Image { Height = 220, HorizontalAlignment = HorizontalAlignment.Left };
+        RenderOptions.SetBitmapScalingMode(preview, BitmapScalingMode.HighQuality);
+        Point[] Shares() => corners.Select(c => new Point(c.X / _pw, c.Y / _ph)).ToArray();
+        void Refresh()
+        {
+            try { preview.Source = Scan.Page(small, Shares(), Mode, 600); SaveButton.IsEnabled = true; }
+            catch (InvalidOperationException) { SaveButton.IsEnabled = false; } // corners on top of each other
+        }
+        void Draw()
+        {
+            var k = PxPerDip;
+            var sheet = new PathGeometry(new[] { new PathFigure(corners[0], corners.Skip(1).Select(c => (PathSegment)new LineSegment(c, true)), true) });
+            dim.Data = new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(new Rect(0, 0, _pw, _ph)), sheet);
+            outline.Points = new PointCollection(corners);
+            outline.StrokeThickness = 2 * k;
+            var s = 18 * k;
+            for (var i = 0; i < 4; i++)
+            {
+                Place(handles[i], new Rect(corners[i].X - s / 2, corners[i].Y - s / 2, s, s));
+                handles[i].StrokeThickness = 2 * k;
+            }
+        }
+        void Set(IEnumerable<Point> shares) { corners = shares.Select(c => new Point(c.X * _pw, c.Y * _ph)).ToArray(); Draw(); Refresh(); }
+
+        var held = -1;
+        OnDrag(p =>
+        {
+            var near = Enumerable.Range(0, 4).MinBy(i => (corners[i] - p).Length);
+            held = (corners[near] - p).Length < 24 * PxPerDip ? near : -1;
+        }, p => { if (held >= 0) { corners[held] = p; Draw(); } }, _ => { if (held >= 0) Refresh(); held = -1; });
+
+        Segmented("Modo", new (string, Action)[]
+        {
+            ("Color", () => Pick(ScanMode.Color)), ("Gris", () => Pick(ScanMode.Gray)), ("B/N", () => Pick(ScanMode.BlackWhite)),
+        }, selected: 1);
+        void Pick(ScanMode m) { Mode = m; Refresh(); }
+        ReadText = Ocr.Available;
+        var ocr = new CheckBox { Content = "Texto buscable (OCR)", IsChecked = ReadText, IsEnabled = Ocr.Available, VerticalAlignment = VerticalAlignment.Center };
+        ocr.Click += (_, _) => ReadText = ocr.IsChecked == true;
+        AddControl(null, ocr);
+        AddControl("Vista previa", new Border { Child = preview, BorderBrush = (Brush)FindResource("Line"), BorderThickness = new Thickness(1), HorizontalAlignment = HorizontalAlignment.Left });
+        AddControl(null, ActionButton("Detectar de nuevo", () => Set(Scan.FindPage(_source))));
+        AddControl(null, ActionButton("Toda la imagen", () => Set(new[] { new Point(0, 0), new Point(1, 0), new Point(1, 1), new Point(0, 1) })));
+
+        Stage.SizeChanged += (_, _) => Dispatcher.BeginInvoke(Draw, System.Windows.Threading.DispatcherPriority.Loaded);
+        Draw();
+        Refresh();
+        _finish = () =>
+        {
+            var (shares, mode) = (Shares(), Mode);
+            return p => Scan.Page(p, shares, mode);
+        };
     }
 
     // ---- Shared pieces ----

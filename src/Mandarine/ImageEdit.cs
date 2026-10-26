@@ -267,6 +267,10 @@ public static class ImageEdit
 
     static byte Byte(double v) => (byte)Math.Clamp(Math.Round(v * 255), 0, 255);
 
+    public static byte[] Bgra(BitmapSource image, out int w, out int h) => Pixels(image, out w, out h);
+
+    public static BitmapSource FromBgra(byte[] px, int w, int h) => FromPixels(px, w, h);
+
     static byte[] Pixels(BitmapSource image, out int w, out int h)
     {
         var bgra = image.Format == PixelFormats.Bgra32 ? image : new FormatConvertedBitmap(image, PixelFormats.Bgra32, null, 0);

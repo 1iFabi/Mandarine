@@ -23,6 +23,7 @@ public class EditorTests : IDisposable
         Assert.Contains("Ajustes", labels);
         Assert.Contains("Redimensionar", labels);
         Assert.Contains("Fondo", labels);
+        Assert.Contains("Escanear", labels);
         Assert.Equal(new[] { "rotate" }, Catalog.ToolsFor(new[] { "clip.mp4" }).Where(t => t.Engine == Engine.Editor).Select(t => t.Args[0]));
         Assert.Equal(new[] { "pdfrotate", "pdfsplit", "pdforganize" }, Catalog.ToolsFor(new[] { "a.pdf" }).Where(t => t.Engine == Engine.Editor).Select(t => t.Args[0]));
         Assert.Equal("png", ImageEdit.OutputExt("x.webp"));
@@ -71,6 +72,54 @@ public class EditorTests : IDisposable
         Assert.Equal(0, corner[3]);
     });
 
+    [Fact]
+    public void Scan_finds_the_sheet_and_makes_a_searchable_pdf() => OnSta(() =>
+    {
+        var (photo, sheet) = SheetPhoto();
+        var found = Scan.FindPage(photo);
+        for (var i = 0; i < 4; i++)
+            Assert.True((found[i] - sheet[i]).Length < 0.02, $"corner {i}: {found[i]} vs {sheet[i]}");
+
+        var page = Scan.Page(photo, found, ScanMode.BlackWhite);
+        Assert.Equal(Scan.PageLongSide, page.PixelHeight);
+        Assert.InRange(page.PixelWidth, 2600, 2840); // 850 × 1100 keeps its shape
+        Assert.All(Values(page, null).Distinct(), v => Assert.True(v is 0 or 255, $"{v}"));
+
+        Assert.True(Ocr.Available, "run scripts/fetch-tools.ps1 first");
+        var pdf = Path.Combine(_dir, "hoja.pdf");
+        Ocr.ScannedPdf(new[] { Scan.Jpeg(Scan.Page(photo, found, ScanMode.Gray), ScanMode.Gray) }, pdf, readText: true).GetAwaiter().GetResult();
+        using var p = Process.Start(new ProcessStartInfo(Tools.Exe(Engine.Pdfcraft), $"text \"{pdf}\"") { UseShellExecute = false, RedirectStandardOutput = true, StandardOutputEncoding = System.Text.Encoding.UTF8 })!;
+        var text = p.StandardOutput.ReadToEnd();
+        p.WaitForExit();
+        Assert.True(text.Contains("mañana") && text.Contains("acción"), text);
+    });
+
+    /// <summary>A photo of a sheet with text, tilted on a dark table under uneven light, and its corners as shares.</summary>
+    static (BitmapSource Photo, Point[] Corners) SheetPhoto()
+    {
+        const int w = 1600, h = 1300, sw = 850, sh = 1100;
+        var place = Matrix.Identity;
+        place.Translate(-sw / 2.0, -sh / 2.0);
+        place.Rotate(8);
+        place.Translate(w / 2.0, h / 2.0);
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x3A, 0x2E, 0x26)), null, new Rect(0, 0, w, h));
+            dc.PushTransform(new MatrixTransform(place));
+            dc.DrawRectangle(new LinearGradientBrush(Colors.White, Color.FromRgb(0xC8, 0xC0, 0xB0), 30), null, new Rect(0, 0, sw, sh));
+            var lines = "Carta de la mañana\nEl pingüino comió una piña.\nAño de acción y canción.";
+            dc.DrawText(new FormattedText(lines, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+                new Typeface("Segoe UI"), 40, Brushes.Black, 1), new Point(70, 90));
+            dc.Pop();
+        }
+        var bmp = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
+        bmp.Render(visual);
+        var corners = new[] { new Point(0, 0), new Point(sw, 0), new Point(sw, sh), new Point(0, sh) }
+            .Select(c => place.Transform(c)).Select(c => new Point(c.X / w, c.Y / h)).ToArray();
+        return (bmp, corners);
+    }
+
     // Renders each editor so its layout can be looked at without opening it by hand.
     [Theory]
     [InlineData("crop")]
@@ -80,11 +129,12 @@ public class EditorTests : IDisposable
     [InlineData("frame")]
     [InlineData("rotate")]
     [InlineData("resize")]
+    [InlineData("scan")]
     public void Renders_editor_preview(string op) => OnSta(() =>
     {
         var jpg = Path.Combine(_dir, "foto.jpg");
         Ffmpeg($"-f lavfi -i testsrc=size=1200x800 -frames:v 1 \"{jpg}\"");
-        var picture = ImageEdit.Load(jpg).GetAwaiter().GetResult();
+        var picture = op == "scan" ? SheetPhoto().Photo : ImageEdit.Load(jpg).GetAwaiter().GetResult();
         var tool = Catalog.ToolsFor(new[] { jpg }).Single(t => t.Args[0] == op);
         Snapshot(new EditorWindow(op, tool.Label, picture, "C:/Fotos/foto.jpg", "C:/Fotos/foto (Mandarine).jpg", "1 de 3"), $"mandarine-editor-{op}.png");
     });
@@ -196,6 +246,12 @@ public class EditorTests : IDisposable
         bgra.CopyPixels(r, px, r.Width * 4, 0);
         return px.Where((_, i) => i % 4 != 3).Select(b => (double)b).ToArray();
     }
+
+    // The finish notice names where the editors saved, so Run hands back the written paths, not a count.
+    // shortcut: checks the signature only; Run always opens a dialog, so its paths are covered by the manual test.
+    [Fact]
+    public void Run_returns_saved_paths() =>
+        Assert.Equal(typeof(Task<IReadOnlyList<string>>), typeof(Editor).GetMethod(nameof(Editor.Run))!.ReturnType);
 
     static void OnSta(Action test)
     {

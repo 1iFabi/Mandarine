@@ -51,6 +51,31 @@ public static class Ocr
         }
     }
 
+    /// <summary>Scanned pages (drawn at 300 dpi) into one PDF; with readText, each page's words go invisibly over it.</summary>
+    public static async Task ScannedPdf(IReadOnlyList<byte[]> jpegs, string output, bool readText)
+    {
+        var tmp = Directory.CreateTempSubdirectory("mandarine-").FullName;
+        try
+        {
+            var done = await Task.Run(() =>
+            {
+                using var engine = readText ? new TesseractEngine(TessData, Languages, EngineMode.LstmOnly) : null;
+                return jpegs.Select((jpeg, i) =>
+                {
+                    if (engine == null) return new Page(jpeg, Array.Empty<Word>());
+                    var jpg = Path.Combine(tmp, $"{i}.jpg");
+                    File.WriteAllBytes(jpg, jpeg);
+                    return new Page(jpeg, Read(engine, jpg));
+                }).ToList();
+            });
+            WritePdf(output, done);
+        }
+        finally
+        {
+            Directory.Delete(tmp, recursive: true);
+        }
+    }
+
     sealed record Word(string Text, double X, double Y, double Width, double Height); // pixels, top-left origin
     sealed record Page(byte[] Jpeg, IReadOnlyList<Word> Words);
 
