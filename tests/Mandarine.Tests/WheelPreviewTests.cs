@@ -72,6 +72,38 @@ public class WheelPreviewTests
         Assert.True(new FileInfo(path).Length > 2_000);
     }
 
+    // A key with the button held is not always a file drag: the wheel stays unseen until files arrive.
+    [Fact]
+    public void Wheel_waits_unseen_until_the_drag_brings_files()
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var wheel = new WheelWindow { Mode = WheelMode.Convert };
+                var side = (int)Math.Round(wheel.Width * VisualTreeHelper.GetDpi(wheel).DpiScaleX);
+                wheel.ShowAt(FakeDesktop(side, 236), 100, 100);
+                Assert.True(wheel.IsWaitingForFiles);
+                wheel.ShowTargets(new[] { "clip.mp4" });
+                Assert.False(wheel.IsWaitingForFiles);
+                wheel.HideWheel();
+
+                // No files ever came (selecting text with Shift): hiding is immediate, no animation left running.
+                wheel.ShowAt(FakeDesktop(side, 236), 100, 100);
+                wheel.HideWheel();
+                Assert.False(wheel.IsVisible);
+                Assert.False(wheel.IsWaitingForFiles);
+                wheel.Close();
+            }
+            catch (Exception ex) { error = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        Assert.Null(error);
+    }
+
     // A desktop-like backdrop: base tone with lines of "text" and a coloured window.
     static byte[] FakeDesktopBytes(int side, int tone)
     {

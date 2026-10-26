@@ -20,18 +20,18 @@ public enum WheelTheme { Light, Dark }
 public partial class WheelWindow : Window
 {
     // Geometry in DIPs: a ring of frosted segments around a centre disc.
-    const double Size = 210, Center = Size / 2, Outer = 90, Inner = 42, CenterRadius = 32, Gap = 3, Corner = 5, Push = 5;
+    internal const double Size = 210, Center = Size / 2, Outer = 90, Inner = 42, CenterRadius = 32, Gap = 3, Corner = 5, Push = 5;
 
     /// <summary>Frosted glass: the blurred desktop under a milky veil, ink that reads on it.</summary>
-    sealed record Palette(Color Veil, Color CenterVeil, Color Ink);
+    internal sealed record Palette(Color Veil, Color CenterVeil, Color Ink);
 
-    static readonly Palette Light = new(Color.FromArgb(0xC8, 0xF7, 0xF7, 0xF8), Color.FromArgb(0xF0, 0xFF, 0xFF, 0xFF), Color.FromRgb(0x3A, 0x3A, 0x3C));
+    internal static readonly Palette Light = new(Color.FromArgb(0xC8, 0xF7, 0xF7, 0xF8), Color.FromArgb(0xF0, 0xFF, 0xFF, 0xFF), Color.FromRgb(0x3A, 0x3A, 0x3C));
     static readonly Palette Dark = new(Color.FromArgb(0xC0, 0x2C, 0x2C, 0x2E), Color.FromArgb(0xE8, 0x3A, 0x3A, 0x3C), Color.FromRgb(0xF2, 0xF2, 0xF7));
 
-    static readonly Brush Accent = Frozen(new LinearGradientBrush(Color.FromRgb(0xFF, 0x6A, 0x1F), Color.FromRgb(0xF2, 0x48, 0x00), 90));
+    internal static readonly Brush Accent = Frozen(new LinearGradientBrush(Color.FromRgb(0xFF, 0x6A, 0x1F), Color.FromRgb(0xF2, 0x48, 0x00), 90));
     static readonly FontFamily Face = new("Segoe UI Variable Text, Segoe UI");
     static readonly FontFamily IconFace = new("Segoe Fluent Icons, Segoe MDL2 Assets");
-    static readonly ImageSource? Logo = LoadLogo();
+    internal static readonly ImageSource? Logo = LoadLogo();
 
     readonly DispatcherTimer _releaseWatch = new() { Interval = TimeSpan.FromMilliseconds(50) };
     readonly SpringClock _clock = new();
@@ -42,12 +42,15 @@ public partial class WheelWindow : Window
     Palette _palette = Light;
     double _dpi = 1;
     string[]? _files;
-    int _releasedTicks, _hot = -1;
-    bool _leaving;
+    int _releasedTicks, _waitTicks, _hot = -1;
+    bool _leaving, _waiting;
     TextBlock? _centerLabel;
 
     /// <summary>Hide when the mouse button is released. Off only for previews, where no drag exists.</summary>
     public bool AutoHide { get; set; } = true;
+
+    /// <summary>True while the wheel sits unseen under the pointer, waiting for the drag to bring files.</summary>
+    public bool IsWaitingForFiles => _waiting;
 
     /// <summary>Convert (Shift) shows target formats, Tools (Ctrl) file tools, Actions (Alt) file actions.</summary>
     public WheelMode Mode { get; set; }
@@ -77,7 +80,8 @@ public partial class WheelWindow : Window
         _releaseWatch.Tick += (_, _) =>
         {
             _releasedTicks = KeyboardHook.LeftButtonDown ? 0 : _releasedTicks + 1;
-            if (_releasedTicks >= 6) HideWheel();
+            // A held button with a key is not always a file drag (selecting text, moving a window): no files in 2 s, no wheel.
+            if (_releasedTicks >= 6 || (_waiting && ++_waitTicks >= 40)) HideWheel();
         };
         _clock.Settled += () => { if (_leaving) { _leaving = false; Hide(); } };
     }
@@ -138,10 +142,18 @@ public partial class WheelWindow : Window
             RootScale.ScaleX = RootScale.ScaleY = 0.88 + 0.12 * v;
             RootBlur.Radius = Math.Max(0, (1 - v) * 10);
         });
-        _presence.Target = 1;
-        _clock.Kick();
+        if (AutoHide)
+        {
+            // Unseen but still a drop target (the root's near-invisible fill needs full opacity): it appears once the drag brings files.
+            _waiting = true;
+            Root.Opacity = 1;
+            RootScale.ScaleX = RootScale.ScaleY = 1;
+            RootBlur.Radius = 0;
+            Petals.Visibility = CenterDrop.Visibility = Visibility.Hidden;
+        }
+        else Reveal();
 
-        _releasedTicks = 0;
+        _releasedTicks = _waitTicks = 0;
         Show();
         if (AutoHide) _releaseWatch.Start();
     }
@@ -151,6 +163,7 @@ public partial class WheelWindow : Window
     {
         _releaseWatch.Stop();
         if (!IsVisible || _leaving) return;
+        if (_waiting) { _waiting = false; Hide(); return; } // never seen: nothing to dissolve
         _leaving = true;
         _presence.Response = 0.18;
         _presence.Target = 0;
@@ -168,6 +181,7 @@ public partial class WheelWindow : Window
     public void ShowTargets(string[] files)
     {
         _files = files;
+        if (_waiting) Reveal();
         var entries = Mode switch
         {
             WheelMode.Tools => Catalog.ToolsFor(files),
@@ -177,6 +191,14 @@ public partial class WheelWindow : Window
         for (var i = 0; i < entries.Count; i++) AddSegment(entries[i], i, entries.Count);
         // Nothing to offer: say so in the centre instead of the logo.
         SetCenter(entries.Count == 0 ? "Sin opciones" : null);
+        _clock.Kick();
+    }
+
+    void Reveal()
+    {
+        _waiting = false;
+        Petals.Visibility = CenterDrop.Visibility = Visibility.Visible;
+        _presence.Target = 1;
         _clock.Kick();
     }
 
@@ -349,7 +371,7 @@ public partial class WheelWindow : Window
     }
 
     /// <summary>An annular sector from a0 to a1 (radians), inset by the gap and the corner radius.</summary>
-    static Geometry SegmentGeometry(double a0, double a1)
+    internal static Geometry SegmentGeometry(double a0, double a1)
     {
         double ro = Outer - Corner, ri = Inner + Corner, inset = Gap / 2 + Corner;
         double o0 = a0 + Math.Asin(inset / ro), o1 = a1 - Math.Asin(inset / ro);
